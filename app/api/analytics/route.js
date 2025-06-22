@@ -33,4 +33,17 @@ export async function GET() {
 
     return Response.json({ 
       success: true,
-      r
+      rowCount: response.rowCount || 0,
+      rows: response.rows || [],
+      propertyId: propertyId
+    });
+    
+  } catch (error) {
+    console.error('GA4 API Error Details:', error);
+    return Response.json({ 
+      error: error.message,
+      code: error.code,
+      details: error.details || 'No details'
+    }, { status: 500 });
+  }
+}
