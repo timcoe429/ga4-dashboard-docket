@@ -11,30 +11,39 @@ const analyticsDataClient = new BetaAnalyticsDataClient({
 
 export async function GET() {
   try {
-    // Get top landing pages
+    // First, let's just get basic page views to make sure connection works
     const [pagesResponse] = await analyticsDataClient.runReport({
       property: `properties/${propertyId}`,
       dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
-      dimensions: [{ name: 'landingPagePlusQueryString' }],
+      dimensions: [{ name: 'pagePath' }],  // Changed to pagePath
       metrics: [
-        { name: 'sessions' },
-        { name: 'conversions' },
+        { name: 'screenPageViews' },  // Changed to screenPageViews
+        { name: 'activeUsers' }       // Changed to activeUsers
       ],
       limit: 10,
-      orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+      orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
     });
+
+    console.log('GA4 Response:', pagesResponse); // Add logging
 
     const pages = pagesResponse.rows?.map(row => ({
       page: row.dimensionValues[0].value,
-      sessions: parseInt(row.metricValues[0].value),
-      conversions: parseInt(row.metricValues[1].value),
-      rate: ((parseInt(row.metricValues[1].value) / parseInt(row.metricValues[0].value)) * 100).toFixed(1),
-      trend: Math.random() * 20 - 10, // Mock trend for now
+      sessions: parseInt(row.metricValues[0].value) || 0,
+      conversions: parseInt(row.metricValues[1].value) || 0,
+      rate: 0,
+      trend: Math.random() * 20 - 10,
     })) || [];
 
-    return Response.json({ pages });
+    // Also return row count for debugging
+    return Response.json({ 
+      pages,
+      debug: {
+        rowCount: pagesResponse.rowCount || 0,
+        hasData: pages.length > 0
+      }
+    });
   } catch (error) {
     console.error('GA4 API Error:', error);
-    return Response.json({ error: 'Failed to fetch analytics data' }, { status: 500 });
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }
