@@ -11,12 +11,13 @@ export default function Dashboard() {
   const [dateRange, setDateRange] = useState('last30days');
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
-    metrics: [
-      { title: 'Total Sessions', value: '0', trend: 0, subtitle: 'Last 30 days' },
-      { title: 'Conversions', value: '0', trend: 0, subtitle: 'Last 30 days' },
-      { title: 'Conversion Rate', value: '0%', trend: 0, subtitle: 'Last 30 days' },
-      { title: 'Revenue', value: '$0', trend: 0, subtitle: 'Last 30 days' }
-    ],
+    // Around line 16, in the useState default metrics, change:
+metrics: [
+  { title: 'Total Sessions', value: '0', trend: 0, subtitle: 'Last 30 days' },
+  { title: 'Conversions', value: '0', trend: 0, subtitle: 'Last 30 days' },
+  { title: 'Conversion Rate', value: '0%', trend: 0, subtitle: 'Last 30 days' },
+  { title: 'Top Page Views', value: '0', trend: 0, subtitle: 'Last 30 days' } // Changed from Revenue
+],
     topPages: [],
     blogPosts: [
       { title: 'Loading...', views: 0, trend: 0, conversions: 0 }
@@ -54,12 +55,13 @@ export default function Dashboard() {
           
           setData(prevData => ({
             ...prevData,
-            metrics: [
-              { title: 'Total Sessions', value: totalSessions.toLocaleString(), trend: 12.3, subtitle: 'Last 30 days' },
-              { title: 'Conversions', value: totalConversions.toLocaleString(), trend: 8.7, subtitle: 'Last 30 days' },
-              { title: 'Conversion Rate', value: `${avgRate}%`, trend: -2.1, subtitle: 'Last 30 days' },
-              { title: 'Revenue', value: '$0', trend: 0, subtitle: 'Last 30 days' }
-            ],
+            // In the setData section (around line 56), update metrics:
+metrics: [
+  { title: 'Total Sessions', value: totalSessions.toLocaleString(), trend: 12.3, subtitle: 'Last 30 days' },
+  { title: 'Conversions', value: (result.totalConversions || 0).toLocaleString(), trend: 8.7, subtitle: 'Last 30 days' },
+  { title: 'Conversion Rate', value: `${avgRate}%`, trend: -2.1, subtitle: 'Last 30 days' },
+  { title: 'Top Page Views', value: result.pages[0]?.sessions.toLocaleString() || '0', trend: 15.4, subtitle: result.pages[0]?.page || 'No data' }
+],
             topPages: result.pages.slice(0, 5),
             convertingPages: result.pages
               .filter(page => page.conversions > 0)
