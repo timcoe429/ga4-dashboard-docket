@@ -11,28 +11,80 @@ export async function GET() {
       },
     });
 
-    // Test with a broader query
-    const [response] = await analyticsDataClient.runReport({
+    // Get page data with conversions
+    const [pagesResponse] = await analyticsDataClient.runReport({
       property: `properties/${propertyId}`,
       dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
       dimensions: [{ name: 'pagePath' }],
-      metrics: [{ name: 'screenPageViews' }],
-      limit: 10,
+      metrics: [
+        { name: 'screenPageViews' },
+        { name: 'eventCount' }
+      ],
+      dimensionFilter: {
+        filter: {
+          fieldName: 'pagePath',
+          stringFilter: {
+            matchType: 'DOES_NOT_CONTAIN',
+            value: 'auth'
+          }
+        }
+      },
+      limit: 50,
+      orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }]
     });
 
-    // Return detailed response for debugging
+    // Get conversion events specifically
+    const [conversionsResponse] = await analyticsDataClient.runReport({
+      property: `properties/${propertyId}`,
+      dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+      dimensions: [{ name: 'pagePath' }],
+      metrics: [{ name: 'eventCount' }],
+      dimensionFilter: {
+        filter: {
+          fieldName: 'eventName',
+          stringFilter: {
+            value: 'generate_lead_docket'
+          }
+        }
+      },
+      limit: 20,
+      orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }]
+    });
+
+    // Map conversions by page
+    const conversionsByPage = {};
+    conversionsResponse.rows?.forEach(row => {
+      conversionsByPage[row.dimensionValues[0].value] = parseInt(row.metricValues[0].value) || 0;
+    });
+
+    // Process pages
+    const pages = pagesResponse.rows?.map(row => {
+      const pagePath = row.dimensionValues[0].value;
+      const pageViews = parseInt(row.metricValues[0].value) || 0;
+      const conversions = conversionsByPage[pagePath] || 0;
+      
+      return {
+        page: pagePath,
+        sessions: pageViews,
+        conversions: conversions,
+        rate: pageViews > 0 ? ((conversions / pageViews) * 100).toFixed(1) : 0,
+        trend: Math.random() * 20 - 10 // Mock trend for now
+      };
+    }) || [];
+
+    // Filter blog posts
+    const blogPosts = pages
+      .filter(page => 
+        page.page.includes('/blog') || 
+        page.page.includes('/post') || 
+        page.page.includes('/article')
+      )
+      .slice(0, 4);
+
     return Response.json({ 
-      success: true,
-      rowCount: response.rowCount || 0,
-      rows: response.rows || [],
-      propertyId: propertyId,
-      pages: response.rows?.map(row => ({
-        page: row.dimensionValues[0].value,
-        sessions: parseInt(row.metricValues[0].value) || 0,
-        conversions: 0,
-        rate: 0,
-        trend: 0
-      })) || []
+      pages: pages.filter(p => !p.page.includes('auth')).slice(0, 10),
+      blogPosts: blogPosts,
+      totalConversions: Object.values(conversionsByPage).reduce((sum, val) => sum + val, 0)
     });
     
   } catch (error) {
