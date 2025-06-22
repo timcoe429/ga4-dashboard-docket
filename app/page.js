@@ -8,20 +8,25 @@ import ConvertingPages from '../components/ConvertingPages';
 import FunnelChart from '../components/FunnelChart';
 
 export default function Dashboard() {
-  const [dateRange, setDateRange] = useState('last30days');
+  const [dateRange, setDateRange] = useState('30daysAgo');
   const [loading, setLoading] = useState(true);
+  const [showDateMenu, setShowDateMenu] = useState(false);
+  
+  const dateRanges = [
+    { label: 'Last 7 days', value: '7daysAgo' },
+    { label: 'Last 30 days', value: '30daysAgo' },
+    { label: 'Last 90 days', value: '90daysAgo' }
+  ];
+
   const [data, setData] = useState({
-    // Around line 16, in the useState default metrics, change:
-metrics: [
-  { title: 'Total Sessions', value: '0', trend: 0, subtitle: 'Last 30 days' },
-  { title: 'Conversions', value: '0', trend: 0, subtitle: 'Last 30 days' },
-  { title: 'Conversion Rate', value: '0%', trend: 0, subtitle: 'Last 30 days' },
-  { title: 'Top Page Views', value: '0', trend: 0, subtitle: 'Last 30 days' } // Changed from Revenue
-],
-    topPages: [],
-    blogPosts: [
-      { title: 'Loading...', views: 0, trend: 0, conversions: 0 }
+    metrics: [
+      { title: 'Total Sessions', value: '0', trend: 0, subtitle: 'Loading...' },
+      { title: 'Conversions', value: '0', trend: 0, subtitle: 'Loading...' },
+      { title: 'Conversion Rate', value: '0%', trend: 0, subtitle: 'Loading...' },
+      { title: 'Top Page Views', value: '0', trend: 0, subtitle: 'Loading...' }
     ],
+    topPages: [],
+    blogPosts: [],
     convertingPages: [],
     funnels: {
       signup: [
@@ -41,58 +46,52 @@ metrics: [
     }
   });
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const response = await fetch('/api/analytics');
-        const result = await response.json();
+  async function fetchData() {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/analytics?dateRange=${dateRange}`);
+      const result = await response.json();
+      
+      if (result.pages) {
+        const totalSessions = result.totalSessions || 0;
+        const totalConversions = result.totalConversions || 0;
+        const avgRate = totalSessions > 0 ? ((totalConversions / totalSessions) * 100).toFixed(2) : 0;
+        const dateLabel = dateRanges.find(d => d.value === dateRange)?.label || 'Last 30 days';
         
-        if (result.pages) {
-          // Calculate totals
-          const totalSessions = result.pages.reduce((sum, page) => sum + page.sessions, 0);
-          const totalConversions = result.pages.reduce((sum, page) => sum + page.conversions, 0);
-          const avgRate = totalSessions > 0 ? ((totalConversions / totalSessions) * 100).toFixed(2) : 0;
-          
-          setData(prevData => ({
-            ...prevData,
-            // In the setData section (around line 56), update metrics:
-metrics: [
-  { title: 'Total Sessions', value: totalSessions.toLocaleString(), trend: 12.3, subtitle: 'Last 30 days' },
-  { title: 'Conversions', value: (result.totalConversions || 0).toLocaleString(), trend: 8.7, subtitle: 'Last 30 days' },
-  { title: 'Conversion Rate', value: `${avgRate}%`, trend: -2.1, subtitle: 'Last 30 days' },
-  { title: 'Top Page Views', value: result.pages[0]?.sessions.toLocaleString() || '0', trend: 15.4, subtitle: result.pages[0]?.page || 'No data' }
-],
-            topPages: result.pages.slice(0, 5),
-            convertingPages: result.pages
-              .filter(page => page.conversions > 0)
-              .sort((a, b) => b.conversions - a.conversions)
-              .slice(0, 4)
-              .map(page => ({
-                page: page.page,
-                conversions: page.conversions,
-                revenue: page.conversions * 50,
-                avgValue: 50
-              })),
-            blogPosts: result.pages
-              .filter(page => page.page.includes('/blog') || page.page.includes('/post'))
-              .slice(0, 4)
-              .map(page => ({
-                title: page.page.replace('/blog/', '').replace('/post/', '').replace(/-/g, ' '),
-                views: page.sessions,
-                trend: Math.round(Math.random() * 200 - 50),
-                conversions: page.conversions
-              }))
-          }));
-        }
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-      } finally {
-        setLoading(false);
+        setData(prevData => ({
+          ...prevData,
+          metrics: [
+            { title: 'Total Sessions', value: totalSessions.toLocaleString(), trend: 12.3, subtitle: dateLabel },
+            { title: 'Conversions', value: totalConversions.toLocaleString(), trend: 8.7, subtitle: dateLabel },
+            { title: 'Conversion Rate', value: `${avgRate}%`, trend: -2.1, subtitle: dateLabel },
+            { title: 'Top Page Views', value: result.topPageViews.toLocaleString(), trend: 15.4, subtitle: result.topPagePath }
+          ],
+          topPages: result.pages || [],
+          convertingPages: result.pages
+            .filter(page => page.conversions > 0)
+            .sort((a, b) => b.conversions - a.conversions)
+            .slice(0, 4)
+            .map(page => ({
+              page: page.page,
+              conversions: page.conversions,
+              revenue: page.conversions * 50,
+              avgValue: 50
+            })),
+          blogPosts: result.blogPosts.length > 0 ? result.blogPosts : [
+            { title: 'No blog posts found', views: 0, trend: 0, conversions: 0 }
+          ]
+        }));
       }
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+    } finally {
+      setLoading(false);
     }
+  }
 
+  useEffect(() => {
     fetchData();
-  }, []);
+  }, [dateRange]);
 
   if (loading) {
     return (
@@ -109,10 +108,33 @@ metrics: [
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Analytics Dashboard</h1>
           <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50">
-              <Calendar className="w-4 h-4" />
-              <span className="text-sm font-medium">Last 30 days</span>
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowDateMenu(!showDateMenu)}
+                className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50"
+              >
+                <Calendar className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  {dateRanges.find(d => d.value === dateRange)?.label}
+                </span>
+              </button>
+              {showDateMenu && (
+                <div className="absolute top-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-10">
+                  {dateRanges.map(range => (
+                    <button
+                      key={range.value}
+                      onClick={() => {
+                        setDateRange(range.value);
+                        setShowDateMenu(false);
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+                    >
+                      {range.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50">
               <Filter className="w-4 h-4" />
               <span className="text-sm font-medium">Filters</span>
