@@ -125,8 +125,13 @@ export default function Dashboard() {
         })
       });
       
+      console.log('🔍 Fetching data for property:', currentProperty);
+      console.log('📡 API URL:', `/api/analytics?${params}`);
+      
       const response = await fetch(`/api/analytics?${params}`);
       const result = await response.json();
+      
+      console.log('📊 API Response:', result);
       
       if (result.error) {
         console.error('API Error:', result.error);

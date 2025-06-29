@@ -8,6 +8,11 @@ export async function GET(request) {
     const compareDateRange = searchParams.get('compareDateRange') || '60daysAgo';
     const property = searchParams.get('property') || 'docket'; // Default to docket
     
+    console.log('🔍 API Debug - Received parameters:');
+    console.log('  - property:', property);
+    console.log('  - dateRange:', dateRange);
+    console.log('  - compareMode:', compareMode);
+    
     // Property configurations
     const propertyConfigs = {
       docket: {
@@ -26,8 +31,15 @@ export async function GET(request) {
 
     const currentConfig = propertyConfigs[property];
     if (!currentConfig) {
+      console.error('❌ Invalid property specified:', property);
       return Response.json({ error: 'Invalid property specified' }, { status: 400 });
     }
+
+    console.log('✅ Using config for property:', property);
+    console.log('  - displayName:', currentConfig.displayName);
+    console.log('  - propertyId:', currentConfig.propertyId);
+    console.log('  - conversionEvent:', currentConfig.conversionEvent);
+    console.log('  - excludeDomains:', currentConfig.excludeDomains);
 
     const analyticsDataClient = new BetaAnalyticsDataClient({
       credentials: {
@@ -84,6 +96,9 @@ export async function GET(request) {
     ];
 
     // Get current period data
+    console.log('📊 Making GA4 API call for pages data...');
+    console.log('  - Property:', `properties/${currentConfig.propertyId}`);
+    
     const [currentPagesResponse] = await analyticsDataClient.runReport({
       property: `properties/${currentConfig.propertyId}`,
       dateRanges: [{ startDate: dateRange, endDate: 'today' }],
@@ -103,7 +118,14 @@ export async function GET(request) {
       orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }]
     });
 
+    console.log('📈 Pages API Response:');
+    console.log('  - Rows returned:', currentPagesResponse.rows?.length || 0);
+    console.log('  - Sample data:', currentPagesResponse.rows?.[0]);
+
     // Get current period conversions
+    console.log('🎯 Making GA4 API call for conversions data...');
+    console.log('  - Conversion Event:', currentConfig.conversionEvent);
+    
     const [currentConversionsResponse] = await analyticsDataClient.runReport({
       property: `properties/${currentConfig.propertyId}`,
       dateRanges: [{ startDate: dateRange, endDate: 'today' }],
@@ -120,6 +142,10 @@ export async function GET(request) {
       orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
       limit: 50
     });
+
+    console.log('🎯 Conversions API Response:');
+    console.log('  - Conversion rows returned:', currentConversionsResponse.rows?.length || 0);
+    console.log('  - Sample conversion data:', currentConversionsResponse.rows?.[0]);
 
     // Process current period data
     const currentPageGroups = {};
@@ -312,6 +338,13 @@ export async function GET(request) {
     const totalSessions = currentPages.reduce((sum, page) => sum + page.sessions, 0);
     const totalConversions = currentPages.reduce((sum, page) => sum + page.conversions, 0);
     const totalUsers = currentPages.reduce((sum, page) => sum + page.users, 0);
+    
+    console.log('📊 Final Calculated Totals:');
+    console.log('  - Property:', currentConfig.displayName);
+    console.log('  - Total Sessions:', totalSessions);
+    console.log('  - Total Conversions:', totalConversions);
+    console.log('  - Total Users:', totalUsers);
+    console.log('  - Conversion Rate:', totalSessions > 0 ? ((totalConversions / totalSessions) * 100).toFixed(2) + '%' : '0%');
 
     // Category performance
     const categoryPerformance = {};
