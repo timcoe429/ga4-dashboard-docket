@@ -20,13 +20,13 @@ export default function BlogPosts({ data }) {
             <div className="flex-1">
               <h3 className="text-sm font-medium text-gray-900 mb-1">{post.title || 'Untitled'}</h3>
               <div className="flex items-center gap-4 text-xs text-gray-500">
-                <span>{(post.views || 0).toLocaleString()} views</span>
+                <span>{(post.views || post.sessions || 0).toLocaleString()} views</span>
                 <span>{post.conversions || 0} conversions</span>
               </div>
             </div>
             <div className={`flex items-center gap-1 text-sm font-medium ${post.trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
               {post.trend > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-              {post.trend > 0 ? '+' : ''}{post.trend || 0}%
+              {post.trend > 0 ? '+' : ''}{parseFloat(post.trend || 0).toFixed(1)}%
             </div>
           </div>
         ))}

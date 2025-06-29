@@ -8,7 +8,7 @@ export default function MetricCard({ title, value, trend, subtitle }) {
         <p className="text-2xl font-semibold text-gray-900">{value}</p>
         {trend && (
           <span className={`text-sm font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-            {isPositive ? '+' : ''}{trend}%
+            {isPositive ? '+' : ''}{parseFloat(trend).toFixed(1)}%
           </span>
         )}
       </div>

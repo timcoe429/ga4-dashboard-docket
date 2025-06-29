@@ -5,13 +5,13 @@ export default function ConvertingPages({ data }) {
       <div className="space-y-3">
         {data.map((page, i) => (
           <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
+            <div className="flex-1">
               <h3 className="text-sm font-medium text-gray-900">{page.page}</h3>
-              <p className="text-xs text-gray-500">{page.conversions.toLocaleString()} conversions</p>
+              <p className="text-xs text-gray-500">{page.conversions.toLocaleString()} conversions from {page.sessions?.toLocaleString() || 0} sessions</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-semibold text-gray-900">${page.revenue.toLocaleString()}</p>
-              <p className="text-xs text-gray-500">${page.avgValue} avg</p>
+              <p className="text-sm font-semibold text-green-600">{page.rate || 0}%</p>
+              <p className="text-xs text-gray-500">conversion rate</p>
             </div>
           </div>
         ))}

@@ -28,22 +28,7 @@ export default function Dashboard() {
     topPages: [],
     blogPosts: [],
     convertingPages: [],
-    funnels: {
-      signup: [
-        { step: 'Landing Page', users: 10000, rate: 100 },
-        { step: 'Signup Form', users: 4500, rate: 45 },
-        { step: 'Email Verify', users: 3800, rate: 38 },
-        { step: 'Complete Profile', users: 2900, rate: 29 },
-        { step: 'First Action', users: 2100, rate: 21 }
-      ],
-      purchase: [
-        { step: 'Product Page', users: 8000, rate: 100 },
-        { step: 'Add to Cart', users: 2400, rate: 30 },
-        { step: 'Checkout', users: 1680, rate: 21 },
-        { step: 'Payment', users: 1344, rate: 16.8 },
-        { step: 'Success', users: 1210, rate: 15.1 }
-      ]
-    }
+    funnelData: {}
   });
 
   async function fetchData() {
@@ -55,7 +40,7 @@ export default function Dashboard() {
       if (result.pages) {
         const totalSessions = result.totalSessions || 0;
         const totalConversions = result.totalConversions || 0;
-        const avgRate = totalSessions > 0 ? ((totalConversions / totalSessions) * 100).toFixed(2) : 0;
+        const avgRate = totalSessions > 0 ? parseFloat(((totalConversions / totalSessions) * 100).toFixed(1)) : 0;
         const dateLabel = dateRanges.find(d => d.value === dateRange)?.label || 'Last 30 days';
         
         setData(prevData => ({
@@ -74,12 +59,11 @@ export default function Dashboard() {
             .map(page => ({
               page: page.page,
               conversions: page.conversions,
-              revenue: page.conversions * 50,
-              avgValue: 50
+              sessions: page.sessions,
+              rate: page.rate
             })),
-          blogPosts: result.blogPosts.length > 0 ? result.blogPosts : [
-            { title: 'No blog posts found', views: 0, trend: 0, conversions: 0 }
-          ]
+          blogPosts: result.blogPosts.length > 0 ? result.blogPosts : [],
+          funnelData: result.funnelData || {}
         }));
       }
     } catch (error) {
@@ -106,7 +90,8 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Analytics Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Marketing Analytics Dashboard</h1>
+          <p className="text-gray-600 mb-4">Clean insights into what's working and what isn't</p>
           <div className="flex items-center gap-4">
             <div className="relative">
               <button 
@@ -162,7 +147,7 @@ export default function Dashboard() {
 
         {/* Funnel */}
         <div className="mb-6">
-          <FunnelChart data={data.funnels} />
+          <FunnelChart data={data.funnels} funnelData={data.funnelData} />
         </div>
       </div>
     </div>

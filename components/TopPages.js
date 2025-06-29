@@ -25,7 +25,7 @@ export default function TopPages({ data }) {
                 <td className="py-3">
                   <span className={`flex items-center gap-1 text-sm font-medium ${page.trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {page.trend > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    {Math.abs(page.trend)}%
+                    {Math.abs(page.trend).toFixed(1)}%
                   </span>
                 </td>
               </tr>
