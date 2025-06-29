@@ -1,5 +1,7 @@
 'use client';
 import { useState } from 'react';
+import { signIn, getSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, BarChart3, Shield, Zap } from 'lucide-react';
 
 export default function LoginPage() {
@@ -7,16 +9,32 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     
-    // Simulate login process
-    setTimeout(() => {
-      // For now, just redirect to dashboard
-      window.location.href = '/dashboard';
-    }, 1500);
+    try {
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError('Invalid email or password');
+      } else {
+        // Successful login, redirect to dashboard
+        router.push('/dashboard');
+      }
+    } catch (error) {
+      setError('An error occurred during login');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -73,6 +91,13 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Error Message */}
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
             {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between">
               <label className="flex items-center">
@@ -104,14 +129,14 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Demo Notice */}
-          <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          {/* Login Info */}
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start gap-3">
-              <Shield className="w-5 h-5 text-amber-600 mt-0.5" />
+              <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
               <div>
-                <h4 className="text-sm font-medium text-amber-800">Demo Mode</h4>
-                <p className="text-sm text-amber-700 mt-1">
-                  Authentication is not yet configured. Any email/password will redirect to the dashboard.
+                <h4 className="text-sm font-medium text-blue-800">Secure Access</h4>
+                <p className="text-sm text-blue-700 mt-1">
+                  Use your authorized ServiceCore credentials to access the analytics dashboard.
                 </p>
               </div>
             </div>

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useSession, signOut } from 'next-auth/react';
 import { Calendar, TrendingUp, BarChart3, Users, Target, RefreshCw, Eye, EyeOff, ChevronRight, ChevronLeft, Settings, Building2, LogOut } from 'lucide-react';
 import MetricCard from '../../components/MetricCard';
 import TopPages from '../../components/TopPages';
@@ -10,6 +11,7 @@ import UserJourneyMap from '../../components/UserJourneyMap';
 import SimpleABTesting from '../../components/ABTestingDashboard';
 
 export default function Dashboard() {
+  const { data: session, status } = useSession();
   const [dateRange, setDateRange] = useState('30daysAgo');
   const [loading, setLoading] = useState(true);
   const [showDateMenu, setShowDateMenu] = useState(false);
@@ -187,8 +189,18 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    fetchData();
-  }, [dateRange, compareMode, currentProperty]);
+    if (session) {
+      fetchData();
+    }
+  }, [dateRange, compareMode, currentProperty, session]);
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-xl text-gray-600">Loading...</div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -465,7 +477,7 @@ export default function Dashboard() {
             </div>
             
             <button
-              onClick={() => window.location.href = '/login'}
+              onClick={() => signOut({ callbackUrl: '/login' })}
               className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
               <LogOut className="w-4 h-4" />
