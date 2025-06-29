@@ -1,7 +1,7 @@
 import { ArrowUpRight, ArrowDownRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 
-export default function BlogPosts({ data }) {
+export default function BlogPosts({ data, showComparison = false }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Handle empty or invalid data
@@ -30,31 +30,51 @@ export default function BlogPosts({ data }) {
       {isExpanded && (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead>
                 <tr className="text-left text-sm text-gray-500 border-b">
-                  <th className="pb-3 font-medium">Blog Post</th>
-                  <th className="pb-3 font-medium text-center">Views</th>
-                  <th className="pb-3 font-medium text-center">Traffic Change</th>
+                  <th className="pb-3 font-medium w-3/5">Blog Post</th>
+                  <th className="pb-3 font-medium text-center w-24">Views</th>
+                  <th className="pb-3 font-medium text-center w-32">
+                    {showComparison ? 'Traffic Change' : 'Views Trend'}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {data.map((post, i) => (
                   <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
                     <td className="py-3 pr-4">
-                      <h3 className="text-sm font-medium text-gray-900">{post.title || 'Untitled'}</h3>
-                    </td>
-                    <td className="py-3 text-sm text-gray-600 text-center font-medium">
-                      {(post.views || post.sessions || 0).toLocaleString()}
+                      <div className="text-left">
+                        <h3 className="text-sm font-medium text-gray-900 truncate">{post.title || 'Untitled'}</h3>
+                      </div>
                     </td>
                     <td className="py-3 text-center">
-                      <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${
-                        post.trend > 0 ? 'bg-green-100 text-green-700' : 
-                        post.trend < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
-                      }`}>
-                        {post.trend > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                        {post.trend > 0 ? '+' : ''}{parseFloat(post.trend || 0).toFixed(1)}%
+                      <div className="text-sm text-gray-600 font-medium">
+                        {(post.views || post.sessions || 0).toLocaleString()}
                       </div>
+                    </td>
+                    <td className="py-3 text-center">
+                      {showComparison ? (
+                        // Show comparison trend when in comparison mode
+                        (post.sessionsTrend !== undefined && post.sessionsTrend !== 0) ? (
+                          <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${
+                            post.sessionsTrend > 0 ? 'bg-green-100 text-green-700' : 
+                            post.sessionsTrend < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {post.sessionsTrend > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                            {post.sessionsTrend > 0 ? '+' : ''}{parseFloat(post.sessionsTrend).toFixed(1)}%
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold bg-gray-100 text-gray-500">
+                            No change
+                          </div>
+                        )
+                      ) : (
+                        // Show static message when not in comparison mode
+                        <div className="text-xs text-gray-500 italic">
+                          Enable comparison to see trends
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -70,9 +90,11 @@ export default function BlogPosts({ data }) {
                 <span className="font-bold">
                   {data.reduce((sum, post) => sum + (post.views || post.sessions || 0), 0).toLocaleString()} total views
                 </span>
-                <span className="font-bold">
-                  {data.filter(post => post.trend > 0).length} posts trending up
-                </span>
+                {showComparison && (
+                  <span className="font-bold">
+                    {data.filter(post => post.sessionsTrend && post.sessionsTrend > 0).length} posts trending up
+                  </span>
+                )}
               </div>
             </div>
           </div>

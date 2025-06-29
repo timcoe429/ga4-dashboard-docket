@@ -37,24 +37,24 @@ export default function TopPages({ data, showComparison = false }) {
       {isExpanded && (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full table-fixed">
               <thead>
                 <tr className="text-left text-sm text-gray-500 border-b">
-                  <th className="pb-3 font-medium">Page</th>
-                  <th className="pb-3 font-medium text-center">Sessions</th>
-                  <th className="pb-3 font-medium text-center">Conversions</th>
-                  <th className="pb-3 font-medium text-center">Conv. Rate</th>
-                  {showComparison && <th className="pb-3 font-medium text-center">📈 Trend vs Previous</th>}
-                  <th className="pb-3 font-medium text-center">Actions</th>
+                  <th className="pb-3 font-medium w-2/5">Page</th>
+                  <th className="pb-3 font-medium text-center w-20">Sessions</th>
+                  <th className="pb-3 font-medium text-center w-20">Conversions</th>
+                  <th className="pb-3 font-medium text-center w-20">Conv. Rate</th>
+                  {showComparison && <th className="pb-3 font-medium text-center w-32">📈 Trend vs Previous</th>}
+                  <th className="pb-3 font-medium text-center w-20">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {data.map((page, i) => (
                   <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
                     <td className="py-3 pr-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{page.title || page.page}</p>
-                        <p className="text-xs text-gray-500">{page.page}</p>
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-gray-900 truncate">{page.title || page.page}</p>
+                        <p className="text-xs text-gray-500 truncate">{page.page}</p>
                         {page.category && (
                           <span className="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded mt-1">
                             {page.category}
@@ -62,25 +62,27 @@ export default function TopPages({ data, showComparison = false }) {
                         )}
                       </div>
                     </td>
-                    <td className="py-3 text-sm text-gray-600 text-center font-medium">
-                      {page.sessions.toLocaleString()}
+                    <td className="py-3 text-center">
+                      <div className="text-sm text-gray-600 font-medium">
+                        {page.sessions.toLocaleString()}
+                      </div>
                       {showComparison && page.sessionsTrend !== undefined && (
                         <div className={`text-xs font-medium ${page.sessionsTrend > 0 ? 'text-green-600' : page.sessionsTrend < 0 ? 'text-red-600' : 'text-gray-500'}`}>
                           {page.sessionsTrend > 0 ? '+' : ''}{page.sessionsTrend}%
                         </div>
                       )}
                     </td>
-                    <td className="py-3 text-sm text-center">
-                      <span className={`font-medium ${page.conversions > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                    <td className="py-3 text-center">
+                      <div className={`text-sm font-medium ${page.conversions > 0 ? 'text-green-600' : 'text-gray-400'}`}>
                         {page.conversions.toLocaleString()}
-                      </span>
+                      </div>
                       {showComparison && page.conversionsTrend !== undefined && (
                         <div className={`text-xs font-medium ${page.conversionsTrend > 0 ? 'text-green-600' : page.conversionsTrend < 0 ? 'text-red-600' : 'text-gray-500'}`}>
                           {page.conversionsTrend > 0 ? '+' : ''}{page.conversionsTrend}%
                         </div>
                       )}
                     </td>
-                    <td className="py-3 text-sm text-center">
+                    <td className="py-3 text-center">
                       <span className={`font-medium ${
                         page.conversionRate > 3 ? 'text-green-600' : 
                         page.conversionRate > 1 ? 'text-yellow-600' : 

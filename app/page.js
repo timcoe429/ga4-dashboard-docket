@@ -189,7 +189,10 @@ export default function Dashboard() {
             data={data.topConvertingPages} 
             showComparison={data.hasComparison} 
           />
-          <BlogPosts data={data.blogPosts} />
+          <BlogPosts 
+            data={data.blogPosts} 
+            showComparison={data.hasComparison}
+          />
         </div>
 
         {/* Category Performance Analysis */}
