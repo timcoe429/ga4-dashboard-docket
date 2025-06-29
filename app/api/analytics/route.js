@@ -152,6 +152,20 @@ export async function GET(request) {
       conversionsByPage[row.dimensionValues[0].value] = parseInt(row.metricValues[0].value) || 0;
     });
 
+    // Helper function to normalize page paths for grouping
+    function normalizePage(pagePath) {
+      // Normalize home page variations
+      if (!pagePath || pagePath === '/' || pagePath === '' || pagePath === '/index' || pagePath === '/home') {
+        return '/';
+      }
+      
+      // Remove trailing slashes and query parameters for grouping
+      let normalized = pagePath.split('?')[0]; // Remove query params
+      normalized = normalized.replace(/\/$/, '') || '/'; // Remove trailing slash, but keep '/' for root
+      
+      return normalized;
+    }
+
     // Helper function to extract readable titles from URLs
     function extractTitle(pagePath, pageTitle) {
       // Use GA pageTitle if available and meaningful
@@ -173,22 +187,42 @@ export async function GET(request) {
         .trim() || 'Untitled Page';
     }
 
-    // Process pages data
-    const allPages = pagesResponse.rows?.map(row => {
+    // Process pages data and group similar pages
+    const pageGroups = {};
+    pagesResponse.rows?.forEach(row => {
       const pagePath = row.dimensionValues[0].value;
       const pageTitle = row.dimensionValues[1]?.value || '';
       const pageViews = parseInt(row.metricValues[0].value) || 0;
-      const conversions = conversionsByPage[pagePath] || 0;
+      const normalizedPath = normalizePage(pagePath);
       
-      return {
-        page: pagePath,
-        title: extractTitle(pagePath, pageTitle),
-        sessions: pageViews,
-        conversions: conversions,
-        rate: pageViews > 0 ? parseFloat(((conversions / pageViews) * 100).toFixed(1)) : 0,
-        trend: parseFloat((Math.random() * 20 - 10).toFixed(1)) // Random trend for now, replace with actual comparison data
-      };
-    }) || [];
+      if (!pageGroups[normalizedPath]) {
+        pageGroups[normalizedPath] = {
+          page: normalizedPath,
+          title: extractTitle(normalizedPath, pageTitle),
+          sessions: 0,
+          conversions: 0,
+          originalPaths: []
+        };
+      }
+      
+      pageGroups[normalizedPath].sessions += pageViews;
+      pageGroups[normalizedPath].originalPaths.push(pagePath);
+    });
+
+    // Add conversions to grouped pages
+    Object.keys(conversionsByPage).forEach(pagePath => {
+      const normalizedPath = normalizePage(pagePath);
+      if (pageGroups[normalizedPath]) {
+        pageGroups[normalizedPath].conversions += conversionsByPage[pagePath];
+      }
+    });
+
+    // Convert to array and calculate rates/trends
+    const allPages = Object.values(pageGroups).map(group => ({
+      ...group,
+      rate: group.sessions > 0 ? parseFloat(((group.conversions / group.sessions) * 100).toFixed(1)) : 0,
+      trend: parseFloat((Math.random() * 20 - 10).toFixed(1)) // Random trend for now, replace with actual comparison data
+    })).sort((a, b) => b.sessions - a.sessions);
 
     // Get blog posts with better filtering
     const blogPosts = allPages
@@ -229,12 +263,17 @@ export async function GET(request) {
       }
     });
 
-    // Process funnel data
+    // Process funnel data with normalization
     const funnelData = {};
     homeToDemo.rows?.forEach(row => {
       const path = row.dimensionValues[0].value;
+      const normalizedPath = normalizePage(path);
       const views = parseInt(row.metricValues[0].value) || 0;
-      funnelData[path] = views;
+      
+      if (!funnelData[normalizedPath]) {
+        funnelData[normalizedPath] = 0;
+      }
+      funnelData[normalizedPath] += views;
     });
 
     return Response.json({ 
