@@ -253,11 +253,11 @@ export default function Dashboard() {
     <>
       {/* Floating Navigation Sidebar */}
       {showFloatingNav && (
-        <div className={`fixed left-0 top-1/2 transform -translate-y-1/2 z-50 transition-all duration-300 ${
-          isFloatingNavExpanded ? 'translate-x-0' : '-translate-x-64'
+        <div className={`fixed right-0 top-1/2 transform -translate-y-1/2 z-50 transition-all duration-300 ${
+          isFloatingNavExpanded ? 'translate-x-0' : 'translate-x-80'
         }`}>
           {/* Floating Nav Panel */}
-          <div className="bg-white shadow-2xl rounded-r-xl border border-gray-200 w-80">
+          <div className="bg-white shadow-2xl rounded-l-xl border border-gray-200 w-80">
             {/* Header */}
             <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex items-center justify-between">
@@ -269,13 +269,13 @@ export default function Dashboard() {
                   onClick={() => setIsFloatingNavExpanded(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  <ChevronLeft className="w-5 h-5" />
+                  <ChevronRight className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
             {/* Controls Content */}
-            <div className="p-4 max-h-96 overflow-y-auto">
+            <div className="p-4">
               {/* Date Range Selector */}
               <div className="mb-6">
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Time Period</label>
@@ -386,10 +386,10 @@ export default function Dashboard() {
           <button
             onClick={() => setIsFloatingNavExpanded(!isFloatingNavExpanded)}
             className={`absolute top-1/2 transform -translate-y-1/2 transition-all duration-300 ${
-              isFloatingNavExpanded ? 'right-0 translate-x-full' : 'right-0 translate-x-full'
-            } bg-blue-600 hover:bg-blue-700 text-white px-2 py-4 rounded-r-lg shadow-lg`}
+              isFloatingNavExpanded ? 'left-0 -translate-x-full' : 'left-0 -translate-x-full'
+            } bg-blue-600 hover:bg-blue-700 text-white px-2 py-4 rounded-l-lg shadow-lg`}
           >
-            <ChevronRight className={`w-5 h-5 transition-transform ${isFloatingNavExpanded ? 'rotate-180' : ''}`} />
+            <ChevronLeft className={`w-5 h-5 transition-transform ${isFloatingNavExpanded ? 'rotate-180' : ''}`} />
           </button>
         </div>
       )}
