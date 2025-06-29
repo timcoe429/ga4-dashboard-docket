@@ -1,10 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Calendar, Filter, BarChart3, TrendingUp } from 'lucide-react';
+import { Calendar, TrendingUp } from 'lucide-react';
 import MetricCard from '../components/MetricCard';
 import TopPages from '../components/TopPages';
-import BlogPosts from '../components/BlogPosts';
 import ConvertingPages from '../components/ConvertingPages';
+import BlogPosts from '../components/BlogPosts';
 import CategoryPerformance from '../components/CategoryPerformance';
 
 export default function Dashboard() {
@@ -12,7 +12,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showDateMenu, setShowDateMenu] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
-  const [compareDateRange, setCompareDateRange] = useState('60daysAgo');
   
   const dateRanges = [
     { label: 'Last 7 days', value: '7daysAgo' },
@@ -43,7 +42,7 @@ export default function Dashboard() {
         dateRange: dateRange,
         ...(compareMode && { 
           compare: 'true', 
-          compareDateRange: compareDateRange 
+          compareDateRange: 'previous' 
         })
       });
       
@@ -103,7 +102,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-  }, [dateRange, compareMode, compareDateRange]);
+  }, [dateRange, compareMode]);
 
   if (loading) {
     return (
@@ -120,7 +119,7 @@ export default function Dashboard() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">🎯 Conversion Analysis Dashboard</h1>
           <p className="text-gray-600 mb-4">Actionable insights into what's driving conversions and what needs optimization</p>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <div className="relative">
               <button 
                 onClick={() => setShowDateMenu(!showDateMenu)}
@@ -159,14 +158,16 @@ export default function Dashboard() {
             >
               <TrendingUp className="w-4 h-4" />
               <span className="text-sm font-medium">
-                {compareMode ? 'Comparing Periods' : 'Compare Periods'}
+                {compareMode ? 'Comparing vs Previous Period' : 'Compare to Previous Period'}
               </span>
             </button>
 
-            <button className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50">
-              <Filter className="w-4 h-4" />
-              <span className="text-sm font-medium">Filters</span>
-            </button>
+            {compareMode && (
+              <div className="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">
+                Comparing {dateRanges.find(d => d.value === dateRange)?.label.toLowerCase()} 
+                vs previous equivalent period
+              </div>
+            )}
           </div>
         </div>
 

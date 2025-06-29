@@ -145,12 +145,31 @@ export async function GET(request) {
     // Get comparison data if requested
     let comparisonData = null;
     if (compareMode) {
-      // Get comparison period data (similar logic)
+      // Calculate proper comparison date range
+      let compareStartDate, compareEndDate;
+      const currentDays = parseInt(dateRange.replace('daysAgo', ''));
+      
+      if (compareDateRange === 'previous') {
+        // Compare to previous equivalent period
+        compareStartDate = `${currentDays * 2}daysAgo`;
+        compareEndDate = `${currentDays}daysAgo`;
+      } else {
+        // Use custom comparison range
+        compareStartDate = compareDateRange;
+        compareEndDate = dateRange.replace('daysAgo', 'daysAgo');
+      }
+
+      // Get comparison period data
       const [comparePagesResponse] = await analyticsDataClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [{ startDate: compareDateRange, endDate: dateRange.replace('daysAgo', 'daysAgo') }],
+        dateRanges: [{ startDate: compareStartDate, endDate: compareEndDate }],
         dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
-        metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }],
+        metrics: [
+          { name: 'screenPageViews' },
+          { name: 'activeUsers' },
+          { name: 'bounceRate' },
+          { name: 'averageSessionDuration' }
+        ],
         dimensionFilter: {
           andGroup: {
             expressions: [
@@ -167,38 +186,63 @@ export async function GET(request) {
 
       const [compareConversionsResponse] = await analyticsDataClient.runReport({
         property: `properties/${propertyId}`,
-        dateRanges: [{ startDate: compareDateRange, endDate: dateRange.replace('daysAgo', 'daysAgo') }],
+        dateRanges: [{ startDate: compareStartDate, endDate: compareEndDate }],
         dimensions: [{ name: 'pagePath' }],
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: {
           andGroup: {
             expressions: [
               { filter: { fieldName: 'eventName', stringFilter: { value: 'generate_lead_docket', matchType: 'EXACT' } } },
-              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } }
+              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
+              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
+              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
+              { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'app.yourdocket.com', matchType: 'EXACT' } } } }
             ]
           }
         },
         limit: 50
       });
 
-      // Process comparison data (simplified for space)
+      // Process comparison data
       const comparePageGroups = {};
       comparePagesResponse.rows?.forEach(row => {
-        const normalizedPath = normalizePage(row.dimensionValues[0].value);
+        const pagePath = row.dimensionValues[0].value;
+        const normalizedPath = normalizePage(pagePath);
         const pageViews = parseInt(row.metricValues[0].value) || 0;
+        const users = parseInt(row.metricValues[1].value) || 0;
+        const bounceRate = parseFloat(row.metricValues[2].value) || 0;
+        const avgDuration = parseFloat(row.metricValues[3].value) || 0;
+
         if (!comparePageGroups[normalizedPath]) {
-          comparePageGroups[normalizedPath] = { sessions: 0, conversions: 0 };
+          comparePageGroups[normalizedPath] = {
+            sessions: 0,
+            users: 0,
+            conversions: 0,
+            bounceRate: 0,
+            avgDuration: 0
+          };
         }
+
         comparePageGroups[normalizedPath].sessions += pageViews;
+        comparePageGroups[normalizedPath].users += users;
+        comparePageGroups[normalizedPath].bounceRate = bounceRate;
+        comparePageGroups[normalizedPath].avgDuration = avgDuration;
       });
 
+      // Add comparison conversions
       compareConversionsResponse.rows?.forEach(row => {
         const normalizedPath = normalizePage(row.dimensionValues[0].value);
         const conversions = parseInt(row.metricValues[0].value) || 0;
         if (!comparePageGroups[normalizedPath]) {
-          comparePageGroups[normalizedPath] = { sessions: 0, conversions: 0 };
+          comparePageGroups[normalizedPath] = { sessions: 0, users: 0, conversions: 0, bounceRate: 0, avgDuration: 0 };
         }
         comparePageGroups[normalizedPath].conversions = conversions;
+      });
+
+      // Calculate conversion rates for comparison data
+      Object.keys(comparePageGroups).forEach(path => {
+        const data = comparePageGroups[path];
+        data.conversionRate = data.sessions > 0 ? parseFloat(((data.conversions / data.sessions) * 100).toFixed(2)) : 0;
       });
 
       comparisonData = comparePageGroups;
@@ -207,13 +251,40 @@ export async function GET(request) {
     // Calculate trends if comparison data available
     const pagesWithTrends = currentPages.map(page => {
       let trend = 0;
+      let sessionsTrend = 0;
+      let conversionsTrend = 0;
+      
       if (comparisonData && comparisonData[page.page]) {
-        const currentRate = page.conversionRate;
-        const previousRate = comparisonData[page.page].sessions > 0 ? 
-          (comparisonData[page.page].conversions / comparisonData[page.page].sessions) * 100 : 0;
-        trend = previousRate > 0 ? parseFloat(((currentRate - previousRate) / previousRate * 100).toFixed(1)) : 0;
+        const currentData = page;
+        const previousData = comparisonData[page.page];
+        
+        // Calculate conversion rate trend
+        if (previousData.conversionRate > 0) {
+          trend = parseFloat(((currentData.conversionRate - previousData.conversionRate) / previousData.conversionRate * 100).toFixed(1));
+        } else if (currentData.conversionRate > 0) {
+          trend = 100; // New conversions where there were none before
+        }
+        
+        // Calculate sessions trend
+        if (previousData.sessions > 0) {
+          sessionsTrend = parseFloat(((currentData.sessions - previousData.sessions) / previousData.sessions * 100).toFixed(1));
+        }
+        
+        // Calculate conversions trend
+        if (previousData.conversions > 0) {
+          conversionsTrend = parseFloat(((currentData.conversions - previousData.conversions) / previousData.conversions * 100).toFixed(1));
+        } else if (currentData.conversions > 0) {
+          conversionsTrend = 100;
+        }
       }
-      return { ...page, trend };
+      
+      return { 
+        ...page, 
+        trend,
+        sessionsTrend,
+        conversionsTrend,
+        previousData: comparisonData?.[page.page] || null
+      };
     });
 
     // Calculate totals
