@@ -41,9 +41,9 @@ export default function TopPages({ data, showComparison = false }) {
               <thead>
                 <tr className="text-left text-sm text-gray-500 border-b">
                   <th className="pb-3 font-medium">Page</th>
-                  <th className="pb-3 font-medium text-right">Sessions</th>
-                  <th className="pb-3 font-medium text-right">Conversions</th>
-                  <th className="pb-3 font-medium text-right">Conv. Rate</th>
+                  <th className="pb-3 font-medium text-center">Sessions</th>
+                  <th className="pb-3 font-medium text-center">Conversions</th>
+                  <th className="pb-3 font-medium text-center">Conv. Rate</th>
                   {showComparison && <th className="pb-3 font-medium text-center">📈 Trend vs Previous</th>}
                   <th className="pb-3 font-medium text-center">Actions</th>
                 </tr>
@@ -62,7 +62,7 @@ export default function TopPages({ data, showComparison = false }) {
                         )}
                       </div>
                     </td>
-                    <td className="py-3 text-sm text-gray-600 text-right font-medium">
+                    <td className="py-3 text-sm text-gray-600 text-center font-medium">
                       {page.sessions.toLocaleString()}
                       {showComparison && page.sessionsTrend !== undefined && (
                         <div className={`text-xs font-medium ${page.sessionsTrend > 0 ? 'text-green-600' : page.sessionsTrend < 0 ? 'text-red-600' : 'text-gray-500'}`}>
@@ -70,7 +70,7 @@ export default function TopPages({ data, showComparison = false }) {
                         </div>
                       )}
                     </td>
-                    <td className="py-3 text-sm text-right">
+                    <td className="py-3 text-sm text-center">
                       <span className={`font-medium ${page.conversions > 0 ? 'text-green-600' : 'text-gray-400'}`}>
                         {page.conversions.toLocaleString()}
                       </span>
@@ -80,7 +80,7 @@ export default function TopPages({ data, showComparison = false }) {
                         </div>
                       )}
                     </td>
-                    <td className="py-3 text-sm text-right">
+                    <td className="py-3 text-sm text-center">
                       <span className={`font-medium ${
                         page.conversionRate > 3 ? 'text-green-600' : 
                         page.conversionRate > 1 ? 'text-yellow-600' : 

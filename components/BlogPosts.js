@@ -34,8 +34,8 @@ export default function BlogPosts({ data }) {
               <thead>
                 <tr className="text-left text-sm text-gray-500 border-b">
                   <th className="pb-3 font-medium">Blog Post</th>
-                  <th className="pb-3 font-medium text-right">Views</th>
-                  <th className="pb-3 font-medium text-right">Traffic Change</th>
+                  <th className="pb-3 font-medium text-center">Views</th>
+                  <th className="pb-3 font-medium text-center">Traffic Change</th>
                 </tr>
               </thead>
               <tbody>
@@ -44,10 +44,10 @@ export default function BlogPosts({ data }) {
                     <td className="py-3 pr-4">
                       <h3 className="text-sm font-medium text-gray-900">{post.title || 'Untitled'}</h3>
                     </td>
-                    <td className="py-3 text-sm text-gray-600 text-right font-medium">
+                    <td className="py-3 text-sm text-gray-600 text-center font-medium">
                       {(post.views || post.sessions || 0).toLocaleString()}
                     </td>
-                    <td className="py-3 text-right">
+                    <td className="py-3 text-center">
                       <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold ${
                         post.trend > 0 ? 'bg-green-100 text-green-700' : 
                         post.trend < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'

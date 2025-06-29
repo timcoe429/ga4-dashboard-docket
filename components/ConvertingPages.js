@@ -40,9 +40,9 @@ export default function ConvertingPages({ data, showComparison = false }) {
               <thead>
                 <tr className="text-left text-sm text-gray-500 border-b">
                   <th className="pb-3 font-medium">Page</th>
-                  <th className="pb-3 font-medium text-right">Sessions</th>
-                  <th className="pb-3 font-medium text-right">Conversions</th>
-                  <th className="pb-3 font-medium text-right">Conv. Rate</th>
+                  <th className="pb-3 font-medium text-center">Sessions</th>
+                  <th className="pb-3 font-medium text-center">Conversions</th>
+                  <th className="pb-3 font-medium text-center">Conv. Rate</th>
                   {showComparison && <th className="pb-3 font-medium text-center">📈 Trend vs Previous</th>}
                 </tr>
               </thead>
@@ -60,7 +60,7 @@ export default function ConvertingPages({ data, showComparison = false }) {
                         )}
                       </div>
                     </td>
-                    <td className="py-4 text-sm text-gray-600 text-right font-medium">
+                    <td className="py-4 text-sm text-gray-600 text-center font-medium">
                       {page.sessions.toLocaleString()}
                       {showComparison && page.sessionsTrend !== undefined && (
                         <div className={`text-xs font-medium ${page.sessionsTrend > 0 ? 'text-green-600' : page.sessionsTrend < 0 ? 'text-red-600' : 'text-gray-500'}`}>
@@ -68,7 +68,7 @@ export default function ConvertingPages({ data, showComparison = false }) {
                         </div>
                       )}
                     </td>
-                    <td className="py-4 text-sm text-right">
+                    <td className="py-4 text-sm text-center">
                       <span className="font-bold text-green-600">
                         {page.conversions.toLocaleString()}
                       </span>
@@ -78,7 +78,7 @@ export default function ConvertingPages({ data, showComparison = false }) {
                         </div>
                       )}
                     </td>
-                    <td className="py-4 text-right">
+                    <td className="py-4 text-center">
                       <div className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${
                         page.conversionRate > 5 ? 'bg-green-100 text-green-800' : 
                         page.conversionRate > 2 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
