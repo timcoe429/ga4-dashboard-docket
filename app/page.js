@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Calendar, TrendingUp, BarChart3, Users, Target, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import { Calendar, TrendingUp, BarChart3, Users, Target, RefreshCw, Eye, EyeOff, ChevronRight, ChevronLeft, Settings } from 'lucide-react';
 import MetricCard from '../components/MetricCard';
 import TopPages from '../components/TopPages';
 import ConvertingPages from '../components/ConvertingPages';
@@ -14,6 +14,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showDateMenu, setShowDateMenu] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
+  
+  // Floating navigation state
+  const [showFloatingNav, setShowFloatingNav] = useState(false);
+  const [isFloatingNavExpanded, setIsFloatingNavExpanded] = useState(false);
+  const [showFloatingDateMenu, setShowFloatingDateMenu] = useState(false);
   
   // Section visibility state
   const [visibleSections, setVisibleSections] = useState({
@@ -46,6 +51,24 @@ export default function Dashboard() {
     });
     setVisibleSections(newState);
   };
+
+  // Scroll detection for floating nav
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      // Show floating nav when scrolled down more than 300px
+      setShowFloatingNav(scrollTop > 300);
+      
+      // Close expanded nav when scrolling back to top
+      if (scrollTop <= 300) {
+        setIsFloatingNavExpanded(false);
+        setShowFloatingDateMenu(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   const dateRanges = [
     { label: 'Last 7 days', value: '7daysAgo' },
@@ -227,6 +250,150 @@ export default function Dashboard() {
   };
 
   return (
+    <>
+      {/* Floating Navigation Sidebar */}
+      {showFloatingNav && (
+        <div className={`fixed left-0 top-1/2 transform -translate-y-1/2 z-50 transition-all duration-300 ${
+          isFloatingNavExpanded ? 'translate-x-0' : '-translate-x-64'
+        }`}>
+          {/* Floating Nav Panel */}
+          <div className="bg-white shadow-2xl rounded-r-xl border border-gray-200 w-80">
+            {/* Header */}
+            <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-semibold text-blue-900">Dashboard Controls</h3>
+                </div>
+                <button
+                  onClick={() => setIsFloatingNavExpanded(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Controls Content */}
+            <div className="p-4 max-h-96 overflow-y-auto">
+              {/* Date Range Selector */}
+              <div className="mb-6">
+                <label className="text-sm font-medium text-gray-700 mb-2 block">Time Period</label>
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowFloatingDateMenu(!showFloatingDateMenu)}
+                    className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-600" />
+                      <span className="text-sm font-medium">
+                        {dateRanges.find(d => d.value === dateRange)?.label}
+                      </span>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${showFloatingDateMenu ? 'rotate-90' : ''}`} />
+                  </button>
+                  {showFloatingDateMenu && (
+                    <div className="absolute top-full mt-1 w-full bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                      {dateRanges.map(range => (
+                        <button
+                          key={range.value}
+                          onClick={() => {
+                            setDateRange(range.value);
+                            setShowFloatingDateMenu(false);
+                          }}
+                          className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100 transition-colors"
+                        >
+                          {range.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Comparison Toggle */}
+              <div className="mb-6">
+                <label className="text-sm font-medium text-gray-700 mb-2 block">Comparison</label>
+                <button 
+                  onClick={() => setCompareMode(!compareMode)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                    compareMode 
+                      ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                      : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    {compareMode ? 'Comparing vs Previous' : 'Compare to Previous'}
+                  </span>
+                </button>
+              </div>
+
+              {/* Section Toggles */}
+              <div className="mb-4">
+                <label className="text-sm font-medium text-gray-700 mb-3 block">Dashboard Sections</label>
+                
+                {/* Quick Actions */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    onClick={() => toggleAllSections(true)}
+                    className="flex-1 text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                  >
+                    Show All
+                  </button>
+                  <button
+                    onClick={() => toggleAllSections(false)}
+                    className="flex-1 text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                  >
+                    Hide All
+                  </button>
+                </div>
+
+                {/* Individual Section Toggles */}
+                <div className="space-y-2">
+                  {sections.map(section => {
+                    const Icon = section.icon;
+                    const isVisible = visibleSections[section.key];
+                    
+                    return (
+                      <button
+                        key={section.key}
+                        onClick={() => toggleSection(section.key)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-all ${
+                          isVisible 
+                            ? 'border-blue-200 bg-blue-50 text-blue-900' 
+                            : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon className={`w-4 h-4 ${isVisible ? 'text-blue-600' : 'text-gray-500'}`} />
+                          <span className="text-sm font-medium">{section.label}</span>
+                        </div>
+                        {isVisible ? (
+                          <Eye className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <EyeOff className="w-4 h-4 text-gray-400" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Floating Tab Trigger */}
+          <button
+            onClick={() => setIsFloatingNavExpanded(!isFloatingNavExpanded)}
+            className={`absolute top-1/2 transform -translate-y-1/2 transition-all duration-300 ${
+              isFloatingNavExpanded ? 'right-0 translate-x-full' : 'right-0 translate-x-full'
+            } bg-blue-600 hover:bg-blue-700 text-white px-2 py-4 rounded-r-lg shadow-lg`}
+          >
+            <ChevronRight className={`w-5 h-5 transition-transform ${isFloatingNavExpanded ? 'rotate-180' : ''}`} />
+          </button>
+        </div>
+      )}
+
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
@@ -460,5 +627,6 @@ export default function Dashboard() {
         )}
       </div>
     </div>
+    </>
   );
 }
