@@ -70,7 +70,10 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
                           stepIndex === path.steps.length - 1 ? 
                             'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
                         }`}>
-                          {step.page}
+                          <div>{step.page}</div>
+                          {step.url && (
+                            <div className="text-xs opacity-75 mt-1">{step.url}</div>
+                          )}
                         </div>
                         {stepIndex < path.steps.length - 1 && (
                           <ArrowRight className="w-4 h-4 text-gray-400" />
@@ -97,19 +100,56 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
                         </div>
                       </div>
                       
-                      {/* Step Analysis */}
+                      {/* Step Analysis with URLs */}
                       <div className="mt-4">
-                        <h4 className="font-medium text-gray-900 mb-2">Step Analysis:</h4>
-                        <div className="space-y-2">
+                        <h4 className="font-medium text-gray-900 mb-3">🔍 Detailed Step Analysis:</h4>
+                        <div className="space-y-3">
                           {path.steps.map((step, stepIndex) => (
-                            <div key={stepIndex} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                              <span className="text-sm text-gray-700">{step.page}</span>
-                              <div className="flex items-center gap-4 text-xs text-gray-500">
-                                <span>{step.avgTimeOnPage} avg time</span>
-                                <span>{step.dropOffRate}% drop-off</span>
+                            <div key={stepIndex} className="p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <div>
+                                  <span className="font-medium text-gray-900">{step.page}</span>
+                                  {step.url && (
+                                    <div className="text-sm text-blue-600 font-mono">{step.url}</div>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-xs text-gray-500">Step {stepIndex + 1}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-6 text-sm text-gray-600">
+                                <span>⏱️ {step.avgTimeOnPage} avg time</span>
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  parseFloat(step.dropOffRate) > 40 ? 'bg-red-100 text-red-700' :
+                                  parseFloat(step.dropOffRate) > 20 ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-green-100 text-green-700'
+                                }`}>
+                                  📉 {step.dropOffRate} drop-off
+                                </span>
                               </div>
                             </div>
                           ))}
+                        </div>
+                      </div>
+
+                      {/* Journey Insights */}
+                      <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                        <h4 className="font-medium text-blue-800 mb-2">💡 Journey Insights:</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-blue-700">
+                          <div>
+                            <strong>Best Performing Step:</strong> {
+                              path.steps.reduce((best, step) => 
+                                parseFloat(step.dropOffRate) < parseFloat(best.dropOffRate) ? step : best
+                              ).page
+                            }
+                          </div>
+                          <div>
+                            <strong>Optimization Target:</strong> {
+                              path.steps.reduce((worst, step) => 
+                                parseFloat(step.dropOffRate) > parseFloat(worst.dropOffRate) ? step : worst
+                              ).page
+                            }
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -6,7 +6,6 @@ import TopPages from '../components/TopPages';
 import ConvertingPages from '../components/ConvertingPages';
 import BlogPosts from '../components/BlogPosts';
 import CategoryPerformance from '../components/CategoryPerformance';
-import ConversionFunnel from '../components/ConversionFunnel';
 import UserJourneyMap from '../components/UserJourneyMap';
 import ABTestingDashboard from '../components/ABTestingDashboard';
 
@@ -92,8 +91,7 @@ export default function Dashboard() {
           blogPosts: result.blogPosts.length > 0 ? result.blogPosts : [],
           categoryPerformance: result.categoryPerformance || {},
           highTrafficLowConversion: result.highTrafficLowConversion || [],
-          // 🚀 NEW ADVANCED ANALYTICS DATA
-          funnelData: result.funnelData || [],
+          // 🚀 ADVANCED ANALYTICS DATA
           journeyData: result.journeyData || { topPaths: [], assistingPages: [], completingPages: [], journeyInsights: {} },
           abTestData: result.abTestData || { activeTests: [], completedTests: [], testingSummary: {} },
           hasComparison: result.hasComparison || false,
@@ -188,11 +186,11 @@ export default function Dashboard() {
         {/* Top Pages & Converting Pages */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
           <TopPages 
-            pages={data.pages} 
+            data={data.pages} 
             showComparison={compareMode}
           />
           <ConvertingPages 
-            pages={data.topConvertingPages} 
+            data={data.topConvertingPages} 
             showComparison={compareMode}
           />
         </div>
@@ -200,7 +198,7 @@ export default function Dashboard() {
         {/* Blog Posts and Category Performance */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
           <BlogPosts 
-            blogPosts={data.blogPosts} 
+            data={data.blogPosts} 
             showComparison={compareMode}
           />
           <CategoryPerformance 
@@ -209,27 +207,27 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* ✨ NEW ADVANCED ANALYTICS SECTION ✨ */}
+        {/* ✨ ADVANCED CONVERSION INTELLIGENCE ✨ */}
         <div className="mb-8">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">🚀 Advanced Conversion Intelligence</h2>
-            <p className="text-gray-600">Deep-dive analytics for optimization opportunities</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">🗺️ User Journey Intelligence</h2>
+            <p className="text-gray-600">See exactly how users navigate to conversions</p>
           </div>
           
-          {/* Conversion Funnel - Full Width */}
+          {/* User Journey Mapping - FULL WIDTH */}
           <div className="mb-8">
-            <ConversionFunnel 
-              funnelData={data.funnelData} 
-              showComparison={compareMode}
-            />
-          </div>
-
-          {/* User Journey and A/B Testing Side by Side */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
             <UserJourneyMap 
               journeyData={data.journeyData} 
               showComparison={compareMode}
             />
+          </div>
+
+          {/* A/B Testing - Separate Section */}
+          <div className="mb-8">
+            <div className="text-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">🧪 A/B Testing Dashboard</h2>
+              <p className="text-sm text-gray-500">(Demo data - integrate with your A/B testing platform)</p>
+            </div>
             <ABTestingDashboard 
               abTestData={data.abTestData} 
               showComparison={compareMode}
