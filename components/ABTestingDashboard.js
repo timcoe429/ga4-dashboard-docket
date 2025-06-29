@@ -1,334 +1,319 @@
 'use client';
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Trophy, AlertTriangle, Play, Pause, CheckCircle, XCircle, TrendingUp, Users } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Play, Pause, CheckCircle, XCircle, Calendar, BarChart3 } from 'lucide-react';
 
-export default function ABTestingDashboard({ abTestData, showComparison = false }) {
+export default function SimpleABTesting({ abTestData, showComparison = false }) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [selectedTest, setSelectedTest] = useState(null);
+  const [showAddTest, setShowAddTest] = useState(false);
+  const [newTest, setNewTest] = useState({
+    url: '',
+    testName: '',
+    description: ''
+  });
 
-  if (!abTestData || !abTestData.activeTests) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">🧪 A/B Testing Dashboard</h2>
-        <div className="text-center py-8">
-          <p className="text-gray-500">Loading A/B test data...</p>
-        </div>
-      </div>
-    );
-  }
+  // Simple demo data - replace with real database integration
+  const [activeTests, setActiveTests] = useState([
+    {
+      id: 1,
+      testName: 'Homepage CTA Update',
+      url: '/',
+      description: 'Testing new "Get Started Free" button',
+      startDate: '2024-01-01',
+      status: 'running',
+      daysRunning: 8,
+      controlPeriod: {
+        sessions: 1250,
+        conversions: 32,
+        conversionRate: 2.56,
+        period: 'Dec 15-29, 2023'
+      },
+      testPeriod: {
+        sessions: 1180,
+        conversions: 41,
+        conversionRate: 3.47,
+        period: 'Jan 1-15, 2024'
+      }
+    },
+    {
+      id: 2,
+      testName: 'Pricing Page Simplification',
+      url: '/pricing',
+      description: 'Removed enterprise tier, simplified layout',
+      startDate: '2024-01-05',
+      status: 'running', 
+      daysRunning: 4,
+      controlPeriod: {
+        sessions: 856,
+        conversions: 28,
+        conversionRate: 3.27,
+        period: 'Dec 20-Jan 3'
+      },
+      testPeriod: {
+        sessions: 420,
+        conversions: 18,
+        conversionRate: 4.29,
+        period: 'Jan 5-present'
+      }
+    }
+  ]);
 
-  const { activeTests, completedTests, testingSummary } = abTestData;
+  const handleAddTest = () => {
+    if (newTest.url && newTest.testName) {
+      const test = {
+        id: Date.now(),
+        testName: newTest.testName,
+        url: newTest.url,
+        description: newTest.description,
+        startDate: new Date().toISOString().split('T')[0],
+        status: 'starting',
+        daysRunning: 0,
+        controlPeriod: {
+          sessions: 0,
+          conversions: 0,
+          conversionRate: 0,
+          period: 'Previous 14 days (calculating...)'
+        },
+        testPeriod: {
+          sessions: 0,
+          conversions: 0,
+          conversionRate: 0,
+          period: 'Starting today'
+        }
+      };
+      
+      setActiveTests([...activeTests, test]);
+      setNewTest({ url: '', testName: '', description: '' });
+      setShowAddTest(false);
+    }
+  };
 
-  // Helper function to calculate statistical significance
-  const calculateSignificance = (variantA, variantB) => {
-    const conversionsA = variantA.conversions;
-    const conversionsB = variantB.conversions;
-    const visitorsA = variantA.visitors;
-    const visitorsB = variantB.visitors;
-    
-    const rateA = conversionsA / visitorsA;
-    const rateB = conversionsB / visitorsB;
-    
-    // Simplified z-test calculation
-    const pooledRate = (conversionsA + conversionsB) / (visitorsA + visitorsB);
-    const standardError = Math.sqrt(pooledRate * (1 - pooledRate) * (1/visitorsA + 1/visitorsB));
-    const zScore = Math.abs(rateA - rateB) / standardError;
-    
-    // Convert z-score to confidence level (simplified)
-    let confidence = 0;
-    if (zScore > 2.58) confidence = 99;
-    else if (zScore > 2.33) confidence = 98;
-    else if (zScore > 1.96) confidence = 95;
-    else if (zScore > 1.64) confidence = 90;
-    else confidence = Math.round(((zScore / 1.96) * 95));
-    
-    return Math.min(confidence, 99);
+  const calculateUplift = (test) => {
+    if (test.controlPeriod.conversionRate === 0) return 0;
+    return ((test.testPeriod.conversionRate - test.controlPeriod.conversionRate) / test.controlPeriod.conversionRate * 100);
   };
 
   const getTestStatus = (test) => {
-    if (test.status === 'completed') return test.status;
-    
-    const significance = calculateSignificance(test.variants[0], test.variants[1]);
-    if (significance >= 95) return 'significant';
-    if (test.duration >= 14) return 'ready-to-call';
+    if (test.status === 'starting') return 'setting-up';
+    if (test.daysRunning < 7) return 'early';
+    if (test.daysRunning >= 14) return 'complete';
     return 'running';
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'significant': return 'text-green-600 bg-green-100';
-      case 'completed': return 'text-blue-600 bg-blue-100';
-      case 'ready-to-call': return 'text-yellow-600 bg-yellow-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
   };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">🧪 A/B Testing Dashboard</h2>
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          {isExpanded ? 'Collapse' : 'Expand'}
-        </button>
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">🧪 Simple A/B Testing</h2>
+          <p className="text-sm text-gray-500">Track URL performance changes over 14-day periods</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAddTest(!showAddTest)}
+            className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Test
+          </button>
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {isExpanded ? 'Collapse' : 'Expand'}
+          </button>
+        </div>
       </div>
       
       {isExpanded && (
         <>
-          {/* Testing Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Play className="w-5 h-5 text-blue-600" />
-                <span className="font-medium text-blue-800">Active Tests</span>
+          {/* Add New Test Form */}
+          {showAddTest && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="font-medium text-blue-900 mb-3">Create New A/B Test</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">URL to Test</label>
+                  <input
+                    type="text"
+                    value={newTest.url}
+                    onChange={(e) => setNewTest({...newTest, url: e.target.value})}
+                    placeholder="/pricing"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Test Name</label>
+                  <input
+                    type="text"
+                    value={newTest.testName}
+                    onChange={(e) => setNewTest({...newTest, testName: e.target.value})}
+                    placeholder="Pricing Page Update"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
               </div>
-              <div className="text-2xl font-bold text-blue-600">{testingSummary.activeTests}</div>
-            </div>
-            
-            <div className="p-4 bg-green-50 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Trophy className="w-5 h-5 text-green-600" />
-                <span className="font-medium text-green-800">Significant Results</span>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">What are you testing?</label>
+                <input
+                  type="text"
+                  value={newTest.description}
+                  onChange={(e) => setNewTest({...newTest, description: e.target.value})}
+                  placeholder="New button colors and copy"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
               </div>
-              <div className="text-2xl font-bold text-green-600">{testingSummary.significantTests}</div>
-            </div>
-            
-            <div className="p-4 bg-purple-50 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-5 h-5 text-purple-600" />
-                <span className="font-medium text-purple-800">Avg Uplift</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleAddTest}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  Start Test
+                </button>
+                <button
+                  onClick={() => setShowAddTest(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
               </div>
-              <div className="text-2xl font-bold text-purple-600">{testingSummary.avgUplift}%</div>
-            </div>
-            
-            <div className="p-4 bg-orange-50 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="w-5 h-5 text-orange-600" />
-                <span className="font-medium text-orange-800">Total Visitors</span>
-              </div>
-              <div className="text-2xl font-bold text-orange-600">{testingSummary.totalVisitors.toLocaleString()}</div>
-            </div>
-          </div>
-
-          {/* Active Tests */}
-          <div className="mb-8">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">🚀 Active A/B Tests</h3>
-            <div className="space-y-4">
-              {activeTests.map((test, index) => {
-                const status = getTestStatus(test);
-                const significance = calculateSignificance(test.variants[0], test.variants[1]);
-                const winner = test.variants[0].conversionRate > test.variants[1].conversionRate ? 0 : 1;
-                const uplift = ((test.variants[winner].conversionRate - test.variants[1-winner].conversionRate) / test.variants[1-winner].conversionRate * 100);
-
-                return (
-                  <div 
-                    key={index} 
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer"
-                    onClick={() => setSelectedTest(selectedTest === index ? null : index)}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h4 className="font-semibold text-gray-900">{test.testName}</h4>
-                        <p className="text-sm text-gray-600">{test.pageUrl}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(status)}`}>
-                          {status === 'significant' ? `${significance}% Confident` : 
-                           status === 'ready-to-call' ? 'Ready to Call' : 
-                           status === 'completed' ? 'Completed' : 'Running'}
-                        </span>
-                        {status === 'significant' && (
-                          <Trophy className="w-5 h-5 text-yellow-500" />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Variants Comparison */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {test.variants.map((variant, variantIndex) => (
-                        <div 
-                          key={variantIndex} 
-                          className={`p-4 rounded-lg border-2 ${
-                            status === 'significant' && variantIndex === winner ? 
-                              'border-green-300 bg-green-50' : 'border-gray-200 bg-gray-50'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <h5 className="font-medium text-gray-900">
-                              {variant.name}
-                              {variantIndex === 0 && ' (Control)'}
-                            </h5>
-                            {status === 'significant' && variantIndex === winner && (
-                              <CheckCircle className="w-5 h-5 text-green-600" />
-                            )}
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-600">Visitors:</span>
-                              <span className="font-medium">{variant.visitors.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-600">Conversions:</span>
-                              <span className="font-medium">{variant.conversions.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-sm text-gray-600">Conversion Rate:</span>
-                              <span className="font-bold text-lg">{variant.conversionRate}%</span>
-                            </div>
-                            {variantIndex > 0 && (
-                              <div className="flex justify-between">
-                                <span className="text-sm text-gray-600">vs Control:</span>
-                                <span className={`font-medium ${
-                                  variant.conversionRate > test.variants[0].conversionRate ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                  {variant.conversionRate > test.variants[0].conversionRate ? '+' : ''}
-                                  {((variant.conversionRate - test.variants[0].conversionRate) / test.variants[0].conversionRate * 100).toFixed(1)}%
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Test Details */}
-                    <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
-                      <span>Running for {test.duration} days</span>
-                      <span>Traffic Split: {test.trafficSplit}</span>
-                      {status === 'significant' && (
-                        <span className="font-medium text-green-600">
-                          {uplift > 0 ? '+' : ''}{uplift.toFixed(1)}% uplift
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Expanded Details */}
-                    {selectedTest === index && (
-                      <div className="mt-4 pt-4 border-t border-gray-200">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                          <div className="p-3 bg-blue-50 rounded-lg">
-                            <div className="text-sm font-medium text-blue-800">Statistical Significance</div>
-                            <div className="text-lg font-bold text-blue-600">{significance}%</div>
-                          </div>
-                          <div className="p-3 bg-green-50 rounded-lg">
-                            <div className="text-sm font-medium text-green-800">Sample Size</div>
-                            <div className="text-lg font-bold text-green-600">
-                              {test.variants.reduce((sum, v) => sum + v.visitors, 0).toLocaleString()}
-                            </div>
-                          </div>
-                          <div className="p-3 bg-purple-50 rounded-lg">
-                            <div className="text-sm font-medium text-purple-800">Expected Completion</div>
-                            <div className="text-lg font-bold text-purple-600">{test.expectedCompletion}</div>
-                          </div>
-                        </div>
-
-                        {/* Recommendations */}
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <h4 className="font-medium text-gray-900 mb-2">📊 Recommendations:</h4>
-                          {status === 'significant' ? (
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 text-green-700">
-                                <CheckCircle className="w-4 h-4" />
-                                <span>Test has reached statistical significance!</span>
-                              </div>
-                              <p className="text-sm text-gray-700">
-                                Winner: <strong>{test.variants[winner].name}</strong> with {uplift.toFixed(1)}% uplift. 
-                                Recommend implementing the winning variant.
-                              </p>
-                            </div>
-                          ) : status === 'ready-to-call' ? (
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 text-yellow-700">
-                                <AlertTriangle className="w-4 h-4" />
-                                <span>Test has been running for {test.duration} days but lacks significance.</span>
-                              </div>
-                              <p className="text-sm text-gray-700">
-                                Consider calling the test or extending duration for more data.
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 text-blue-700">
-                                <Play className="w-4 h-4" />
-                                <span>Test is running normally. Continue monitoring.</span>
-                              </div>
-                              <p className="text-sm text-gray-700">
-                                Need {Math.max(0, Math.round((1000 - test.variants.reduce((sum, v) => sum + v.visitors, 0)) / 2))} more visitors per variant.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Completed Tests Summary */}
-          {completedTests && completedTests.length > 0 && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">📈 Recent Completed Tests</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {completedTests.slice(0, 6).map((test, index) => (
-                  <div key={index} className="p-4 border border-gray-200 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-900 truncate">{test.testName}</h4>
-                      {test.hasWinner ? (
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                      ) : (
-                        <XCircle className="w-5 h-5 text-gray-400" />
-                      )}
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Duration:</span>
-                        <span>{test.duration} days</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Visitors:</span>
-                        <span>{test.totalVisitors.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Result:</span>
-                        <span className={test.hasWinner ? 'text-green-600 font-medium' : 'text-gray-500'}>
-                          {test.hasWinner ? `${test.uplift}% uplift` : 'Inconclusive'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-3 p-3 bg-blue-100 rounded text-sm text-blue-800">
+                <strong>How it works:</strong> We'll pull the last 14 days of data for this URL as your "control" baseline. 
+                Then track the next 14 days as your "test" version to compare performance.
               </div>
             </div>
           )}
 
-          {/* A/B Testing Best Practices */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="text-lg font-medium text-blue-800 mb-3">🎯 A/B Testing Best Practices</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <h4 className="font-medium text-blue-800 mb-2">Test Requirements:</h4>
-                <ul className="space-y-1 text-blue-700">
-                  <li>• Minimum 1,000 visitors per variant</li>
-                  <li>• Run for at least 2 weeks</li>
-                  <li>• Test one variable at a time</li>
-                  <li>• Wait for 95% statistical significance</li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-medium text-blue-800 mb-2">Optimization Tips:</h4>
-                <ul className="space-y-1 text-blue-700">
-                  <li>• Test high-impact pages first</li>
-                  <li>• Focus on conversion elements</li>
-                  <li>• Document all test learnings</li>
-                  <li>• Plan follow-up tests based on results</li>
-                </ul>
-              </div>
+          {/* Active Tests */}
+          <div className="space-y-4">
+            {activeTests.map((test) => {
+              const status = getTestStatus(test);
+              const uplift = calculateUplift(test);
+              
+              return (
+                <div key={test.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{test.testName}</h3>
+                      <p className="text-sm text-gray-600">{test.url}</p>
+                      {test.description && (
+                        <p className="text-sm text-gray-500 mt-1">{test.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        status === 'complete' ? 'bg-green-100 text-green-800' :
+                        status === 'running' ? 'bg-blue-100 text-blue-800' :
+                        status === 'early' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {status === 'complete' ? 'Complete' :
+                         status === 'running' ? 'Running' :
+                         status === 'early' ? 'Early Stage' : 'Setting Up'}
+                      </span>
+                      <span className="text-sm text-gray-500">Day {test.daysRunning}/14</span>
+                    </div>
+                  </div>
+
+                  {/* Performance Comparison */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Control Period */}
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <h4 className="font-medium text-gray-900 mb-2">Control (Before)</h4>
+                      <div className="text-xs text-gray-500 mb-2">{test.controlPeriod.period}</div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Sessions:</span>
+                          <span className="font-medium">{test.controlPeriod.sessions.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Conversions:</span>
+                          <span className="font-medium">{test.controlPeriod.conversions}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Conv. Rate:</span>
+                          <span className="font-bold text-lg">{test.controlPeriod.conversionRate}%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Test Period */}
+                    <div className={`p-3 rounded-lg ${
+                      uplift > 0 ? 'bg-green-50 border border-green-200' : 
+                      uplift < 0 ? 'bg-red-50 border border-red-200' : 'bg-blue-50'
+                    }`}>
+                      <h4 className="font-medium text-gray-900 mb-2">Test (After)</h4>
+                      <div className="text-xs text-gray-500 mb-2">{test.testPeriod.period}</div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Sessions:</span>
+                          <span className="font-medium">{test.testPeriod.sessions.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Conversions:</span>
+                          <span className="font-medium">{test.testPeriod.conversions}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Conv. Rate:</span>
+                          <span className="font-bold text-lg">{test.testPeriod.conversionRate}%</span>
+                        </div>
+                        {test.testPeriod.conversionRate > 0 && (
+                          <div className="flex justify-between pt-2 border-t">
+                            <span className="text-sm font-medium">Change:</span>
+                            <span className={`font-bold ${uplift > 0 ? 'text-green-600' : uplift < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                              {uplift > 0 ? '+' : ''}{uplift.toFixed(1)}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Test Recommendations */}
+                  <div className="mt-4 p-3 bg-gray-50 rounded">
+                    <div className="text-sm">
+                      {status === 'setting-up' && (
+                        <span className="text-gray-600">⏳ Setting up test - gathering baseline data from previous 14 days...</span>
+                      )}
+                      {status === 'early' && (
+                        <span className="text-yellow-700">⚠️ Test is still early - wait until day 7+ for reliable results</span>
+                      )}
+                      {status === 'running' && uplift > 10 && (
+                        <span className="text-green-700">✅ Strong positive results! Consider implementing this change.</span>
+                      )}
+                      {status === 'running' && uplift < -10 && (
+                        <span className="text-red-700">❌ Negative impact detected. Consider reverting changes.</span>
+                      )}
+                      {status === 'running' && Math.abs(uplift) <= 10 && (
+                        <span className="text-blue-700">📊 Test running normally. Continue monitoring for clear results.</span>
+                      )}
+                      {status === 'complete' && (
+                        <span className={uplift > 0 ? 'text-green-700' : 'text-red-700'}>
+                          🏁 Test complete! {uplift > 0 ? 'Implement winning version.' : 'Revert to original version.'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {activeTests.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <BarChart3 className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+              <p>No active tests. Click "Add Test" to start tracking URL performance changes.</p>
+            </div>
+          )}
+
+          {/* Instructions */}
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="font-medium text-blue-900 mb-2">💡 How Simple A/B Testing Works</h3>
+            <div className="text-sm text-blue-800 space-y-1">
+              <p><strong>1. Add URL:</strong> Enter any page URL you want to test</p>
+              <p><strong>2. Control Period:</strong> We automatically pull the previous 14 days as your baseline</p>
+              <p><strong>3. Test Period:</strong> Make your changes, then track the next 14 days</p>
+              <p><strong>4. Compare Results:</strong> See if your changes improved conversion rates</p>
+              <p><strong>Best for:</strong> Major page changes, new designs, significant copy updates</p>
             </div>
           </div>
         </>

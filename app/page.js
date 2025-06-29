@@ -7,7 +7,7 @@ import ConvertingPages from '../components/ConvertingPages';
 import BlogPosts from '../components/BlogPosts';
 import CategoryPerformance from '../components/CategoryPerformance';
 import UserJourneyMap from '../components/UserJourneyMap';
-import ABTestingDashboard from '../components/ABTestingDashboard';
+import SimpleABTesting from '../components/ABTestingDashboard';
 
 export default function Dashboard() {
   const [dateRange, setDateRange] = useState('30daysAgo');
@@ -202,7 +202,7 @@ export default function Dashboard() {
             showComparison={compareMode}
           />
           <CategoryPerformance 
-            categoryData={data.categoryPerformance}
+            categoryPerformance={data.categoryPerformance}
             highTrafficLowConversion={data.highTrafficLowConversion}
           />
         </div>
@@ -228,10 +228,10 @@ export default function Dashboard() {
               <h2 className="text-xl font-bold text-gray-900 mb-1">🧪 A/B Testing Dashboard</h2>
               <p className="text-sm text-gray-500">(Demo data - integrate with your A/B testing platform)</p>
             </div>
-            <ABTestingDashboard 
-              abTestData={data.abTestData} 
-              showComparison={compareMode}
-            />
+                      <SimpleABTesting 
+            abTestData={data.abTestData} 
+            showComparison={compareMode}
+          />
           </div>
         </div>
 
