@@ -6,9 +6,29 @@ export async function GET(request) {
     const dateRange = searchParams.get('dateRange') || '30daysAgo';
     const compareMode = searchParams.get('compare') === 'true';
     const compareDateRange = searchParams.get('compareDateRange') || '60daysAgo';
+    const property = searchParams.get('property') || 'docket'; // Default to docket
     
-    const propertyId = process.env.GA4_PROPERTY_ID;
-    
+    // Property configurations
+    const propertyConfigs = {
+      docket: {
+        propertyId: process.env.GA4_PROPERTY_ID,
+        conversionEvent: 'generate_lead_docket',
+        excludeDomains: ['app.yourdocket.com'],
+        displayName: 'Docket'
+      },
+      servicecore: {
+        propertyId: '321097999',
+        conversionEvent: 'generate_lead',
+        excludeDomains: ['app.servicecore.com'],
+        displayName: 'ServiceCore'
+      }
+    };
+
+    const currentConfig = propertyConfigs[property];
+    if (!currentConfig) {
+      return Response.json({ error: 'Invalid property specified' }, { status: 400 });
+    }
+
     const analyticsDataClient = new BetaAnalyticsDataClient({
       credentials: {
         client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -26,12 +46,18 @@ export async function GET(request) {
       return normalized;
     }
 
-    // Helper function to categorize pages
-    function categorizePage(pagePath) {
+    // Helper function to categorize pages (property-specific)
+    function categorizePage(pagePath, propertyType) {
       if (pagePath === '/') return 'Homepage';
       if (pagePath.includes('/blog')) return 'Blog';
       if (pagePath.includes('/pricing') || pagePath.includes('/plans')) return 'Pricing';
-      if (pagePath.includes('software') || pagePath.includes('dumpster') || pagePath.includes('junk')) return 'Product';
+      
+      if (propertyType === 'docket') {
+        if (pagePath.includes('software') || pagePath.includes('dumpster') || pagePath.includes('junk')) return 'Product';
+      } else if (propertyType === 'servicecore') {
+        if (pagePath.includes('software') || pagePath.includes('service') || pagePath.includes('core')) return 'Product';
+      }
+      
       if (pagePath.includes('/about') || pagePath.includes('/contact')) return 'Company';
       return 'Other';
     }
@@ -47,9 +73,19 @@ export async function GET(request) {
       return lastPart.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).trim() || 'Untitled Page';
     }
 
+    // Build domain filter expressions
+    const domainFilterExpressions = [
+      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
+      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
+      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
+      ...currentConfig.excludeDomains.map(domain => ({
+        notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: domain, matchType: 'EXACT' } } }
+      }))
+    ];
+
     // Get current period data
     const [currentPagesResponse] = await analyticsDataClient.runReport({
-      property: `properties/${propertyId}`,
+      property: `properties/${currentConfig.propertyId}`,
       dateRanges: [{ startDate: dateRange, endDate: 'today' }],
       dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
       metrics: [
@@ -60,12 +96,7 @@ export async function GET(request) {
       ],
       dimensionFilter: {
         andGroup: {
-          expressions: [
-            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
-            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
-            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
-            { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'app.yourdocket.com', matchType: 'EXACT' } } } }
-          ]
+          expressions: domainFilterExpressions
         }
       },
       limit: 100,
@@ -74,18 +105,15 @@ export async function GET(request) {
 
     // Get current period conversions
     const [currentConversionsResponse] = await analyticsDataClient.runReport({
-      property: `properties/${propertyId}`,
+      property: `properties/${currentConfig.propertyId}`,
       dateRanges: [{ startDate: dateRange, endDate: 'today' }],
       dimensions: [{ name: 'pagePath' }],
       metrics: [{ name: 'eventCount' }],
       dimensionFilter: {
         andGroup: {
           expressions: [
-            { filter: { fieldName: 'eventName', stringFilter: { value: 'generate_lead_docket', matchType: 'EXACT' } } },
-            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
-            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
-            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
-            { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'app.yourdocket.com', matchType: 'EXACT' } } } }
+            { filter: { fieldName: 'eventName', stringFilter: { value: currentConfig.conversionEvent, matchType: 'EXACT' } } },
+            ...domainFilterExpressions
           ]
         }
       },
@@ -108,7 +136,7 @@ export async function GET(request) {
         currentPageGroups[normalizedPath] = {
           page: normalizedPath,
           title: extractTitle(normalizedPath, pageTitle),
-          category: categorizePage(normalizedPath),
+          category: categorizePage(normalizedPath, property),
           sessions: 0,
           users: 0,
           bounceRate: 0,
@@ -161,7 +189,7 @@ export async function GET(request) {
 
       // Get comparison period data
       const [comparePagesResponse] = await analyticsDataClient.runReport({
-        property: `properties/${propertyId}`,
+        property: `properties/${currentConfig.propertyId}`,
         dateRanges: [{ startDate: compareStartDate, endDate: compareEndDate }],
         dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
         metrics: [
@@ -172,12 +200,7 @@ export async function GET(request) {
         ],
         dimensionFilter: {
           andGroup: {
-            expressions: [
-              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
-              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
-              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
-              { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'app.yourdocket.com', matchType: 'EXACT' } } } }
-            ]
+            expressions: domainFilterExpressions
           }
         },
         limit: 100,
@@ -185,21 +208,19 @@ export async function GET(request) {
       });
 
       const [compareConversionsResponse] = await analyticsDataClient.runReport({
-        property: `properties/${propertyId}`,
+        property: `properties/${currentConfig.propertyId}`,
         dateRanges: [{ startDate: compareStartDate, endDate: compareEndDate }],
         dimensions: [{ name: 'pagePath' }],
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: {
           andGroup: {
             expressions: [
-              { filter: { fieldName: 'eventName', stringFilter: { value: 'generate_lead_docket', matchType: 'EXACT' } } },
-              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
-              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
-              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
-              { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'app.yourdocket.com', matchType: 'EXACT' } } } }
+              { filter: { fieldName: 'eventName', stringFilter: { value: currentConfig.conversionEvent, matchType: 'EXACT' } } },
+              ...domainFilterExpressions
             ]
           }
         },
+        orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
         limit: 50
       });
 
@@ -586,6 +607,15 @@ export async function GET(request) {
     };
 
     return Response.json({
+      // Property context
+      currentProperty: property,
+      propertyConfig: {
+        displayName: currentConfig.displayName,
+        propertyId: currentConfig.propertyId,
+        conversionEvent: currentConfig.conversionEvent,
+        excludeDomains: currentConfig.excludeDomains
+      },
+      
       // Core data
       pages: pagesWithTrends.slice(0, 20),
       totalSessions,
@@ -614,7 +644,8 @@ export async function GET(request) {
         totalPagesAnalyzed: currentPages.length,
         totalConversionsTracked: Object.values(currentConversions).reduce((sum, conv) => sum + conv, 0),
         categoriesFound: Object.keys(categoryPerformance),
-        dateRange: `${dateRange} to today`
+        dateRange: `${dateRange} to today`,
+        property: currentConfig.displayName
       }
     });
     
