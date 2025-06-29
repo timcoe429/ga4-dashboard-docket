@@ -28,7 +28,8 @@ export default function Dashboard() {
     topPages: [],
     blogPosts: [],
     convertingPages: [],
-    funnelData: {}
+    funnelData: {},
+    debugInfo: null
   });
 
   async function fetchData() {
@@ -63,7 +64,8 @@ export default function Dashboard() {
               rate: page.rate
             })),
           blogPosts: result.blogPosts.length > 0 ? result.blogPosts : [],
-          funnelData: result.funnelData || {}
+          funnelData: result.funnelData || {},
+          debugInfo: result.debugInfo || null
         }));
       }
     } catch (error) {
@@ -147,7 +149,7 @@ export default function Dashboard() {
 
         {/* Funnel */}
         <div className="mb-6">
-          <FunnelChart data={data.funnels} funnelData={data.funnelData} />
+          <FunnelChart funnelData={data.funnelData} debugInfo={data.debugInfo} />
         </div>
       </div>
     </div>

@@ -245,35 +245,126 @@ export async function GET(request) {
     const totalSessions = allPages.reduce((sum, page) => sum + page.sessions, 0);
     const totalConversions = Object.values(conversionsByPage).reduce((sum, val) => sum + val, 0);
 
-    // Get funnel data
-    const [homeToDemo] = await analyticsDataClient.runReport({
+    // Get comprehensive funnel data - actual pages and conversions
+    const [funnelPagesResponse] = await analyticsDataClient.runReport({
       property: `properties/${propertyId}`,
       dateRanges: [{ startDate: dateRange, endDate: 'today' }],
       dimensions: [{ name: 'pagePath' }],
       metrics: [{ name: 'screenPageViews' }],
-      dimensionFilter: {
-        orGroup: {
-          expressions: [
-            { filter: { fieldName: 'pagePath', stringFilter: { value: '/', matchType: 'EXACT' } } },
-            { filter: { fieldName: 'pagePath', stringFilter: { value: '/pricing', matchType: 'EXACT' } } },
-            { filter: { fieldName: 'pagePath', stringFilter: { value: '/dumpster-rental-software/', matchType: 'EXACT' } } },
-            { filter: { fieldName: 'pagePath', stringFilter: { value: '/junk-removal-software/', matchType: 'EXACT' } } }
-          ]
-        }
-      }
+      orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+      limit: 100
     });
 
-    // Process funnel data with normalization
-    const funnelData = {};
-    homeToDemo.rows?.forEach(row => {
-      const path = row.dimensionValues[0].value;
-      const normalizedPath = normalizePage(path);
+    // Get conversions by page for funnel analysis
+    const [funnelConversionsResponse] = await analyticsDataClient.runReport({
+      property: `properties/${propertyId}`,
+      dateRanges: [{ startDate: dateRange, endDate: 'today' }],
+      dimensions: [{ name: 'pagePath' }],
+      metrics: [{ name: 'eventCount' }],
+      dimensionFilter: {
+        filter: {
+          fieldName: 'eventName',
+          stringFilter: {
+            value: 'generate_lead_docket',
+            matchType: 'EXACT'
+          }
+        }
+      },
+      orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+      limit: 50
+    });
+
+    // Process all page data for funnel analysis
+    const allPageData = {};
+    funnelPagesResponse.rows?.forEach(row => {
+      const path = normalizePage(row.dimensionValues[0].value);
       const views = parseInt(row.metricValues[0].value) || 0;
       
-      if (!funnelData[normalizedPath]) {
-        funnelData[normalizedPath] = 0;
+      if (!allPageData[path]) {
+        allPageData[path] = { views: 0, conversions: 0 };
       }
-      funnelData[normalizedPath] += views;
+      allPageData[path].views += views;
+    });
+
+    // Add conversion data
+    funnelConversionsResponse.rows?.forEach(row => {
+      const path = normalizePage(row.dimensionValues[0].value);
+      const conversions = parseInt(row.metricValues[0].value) || 0;
+      
+      if (!allPageData[path]) {
+        allPageData[path] = { views: 0, conversions: 0 };
+      }
+      allPageData[path].conversions += conversions;
+    });
+
+    // Define your actual funnels based on real paths
+    const realFunnels = {
+      homeToDemo: {
+        name: 'Home → Pricing → Demo',
+        steps: [
+          { name: 'Home Page', path: '/' },
+          { name: 'Pricing Page', path: '/pricing' },  // We'll find the actual pricing page
+          { name: 'Demo Conversion', path: '/', isConversion: true }
+        ]
+      },
+      dumpsterSoftware: {
+        name: 'Dumpster Software → Demo',
+        steps: [
+          { name: 'Dumpster Software', path: '/dumpster-rental-software' },
+          { name: 'Demo Conversion', path: '/dumpster-rental-software', isConversion: true }
+        ]
+      },
+      junkSoftware: {
+        name: 'Junk Software → Demo',
+        steps: [
+          { name: 'Junk Software', path: '/junk-removal-software' },
+          { name: 'Demo Conversion', path: '/junk-removal-software', isConversion: true }
+        ]
+      }
+    };
+
+    // Find actual pricing page from your data
+    const pricingPages = Object.keys(allPageData).filter(path => 
+      path.includes('pricing') || path.includes('plans') || path.includes('cost')
+    );
+    
+    if (pricingPages.length > 0) {
+      realFunnels.homeToDemo.steps[1].path = pricingPages[0];
+    }
+
+    // Build funnel data with real numbers
+    const processedFunnels = {};
+    
+    Object.keys(realFunnels).forEach(funnelKey => {
+      const funnel = realFunnels[funnelKey];
+      const processedSteps = [];
+      
+      funnel.steps.forEach((step, index) => {
+        const pageData = allPageData[step.path] || { views: 0, conversions: 0 };
+        
+        if (step.isConversion) {
+          // For conversion steps, use conversion count
+          processedSteps.push({
+            step: step.name,
+            users: pageData.conversions,
+            rate: processedSteps.length > 0 && processedSteps[0].users > 0 ? 
+              parseFloat(((pageData.conversions / processedSteps[0].users) * 100).toFixed(1)) : 0
+          });
+        } else {
+          // For view steps, use page views
+          processedSteps.push({
+            step: step.name,
+            users: pageData.views,
+            rate: index === 0 ? 100 : (processedSteps.length > 0 && processedSteps[0].users > 0 ? 
+              parseFloat(((pageData.views / processedSteps[0].users) * 100).toFixed(1)) : 0)
+          });
+        }
+      });
+      
+      processedFunnels[funnelKey] = {
+        name: funnel.name,
+        steps: processedSteps
+      };
     });
 
     return Response.json({ 
@@ -283,7 +374,14 @@ export async function GET(request) {
       totalSessions: totalSessions,
       topPageViews: allPages[0]?.sessions || 0,
       topPagePath: allPages[0]?.page || 'No data',
-      funnelData: funnelData
+      funnelData: processedFunnels,
+      // Debug info to help troubleshoot
+      debugInfo: {
+        totalPagesFound: Object.keys(allPageData).length,
+        topPages: Object.keys(allPageData).slice(0, 10),
+        conversionsFound: Object.values(allPageData).reduce((sum, page) => sum + page.conversions, 0),
+        pricingPagesFound: pricingPages
+      }
     });
     
   } catch (error) {
