@@ -1,16 +1,18 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Calendar, Filter } from 'lucide-react';
+import { Calendar, Filter, BarChart3, TrendingUp } from 'lucide-react';
 import MetricCard from '../components/MetricCard';
 import TopPages from '../components/TopPages';
 import BlogPosts from '../components/BlogPosts';
 import ConvertingPages from '../components/ConvertingPages';
-import FunnelChart from '../components/FunnelChart';
+import CategoryPerformance from '../components/CategoryPerformance';
 
 export default function Dashboard() {
   const [dateRange, setDateRange] = useState('30daysAgo');
   const [loading, setLoading] = useState(true);
   const [showDateMenu, setShowDateMenu] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareDateRange, setCompareDateRange] = useState('60daysAgo');
   
   const dateRanges = [
     { label: 'Last 7 days', value: '7daysAgo' },
@@ -23,50 +25,74 @@ export default function Dashboard() {
       { title: 'Total Sessions', value: '0', trend: 0, subtitle: 'Loading...' },
       { title: 'Conversions', value: '0', trend: 0, subtitle: 'Loading...' },
       { title: 'Conversion Rate', value: '0%', trend: 0, subtitle: 'Loading...' },
-      { title: 'Top Page Views', value: '0', trend: 0, subtitle: 'Loading...' }
+      { title: 'Users', value: '0', trend: 0, subtitle: 'Loading...' }
     ],
-    topPages: [],
+    pages: [],
+    topConvertingPages: [],
     blogPosts: [],
-    convertingPages: [],
-    funnelData: {},
+    categoryPerformance: {},
+    highTrafficLowConversion: [],
+    hasComparison: false,
     debugInfo: null
   });
 
   async function fetchData() {
     setLoading(true);
     try {
-      const response = await fetch(`/api/analytics?dateRange=${dateRange}`);
+      const params = new URLSearchParams({
+        dateRange: dateRange,
+        ...(compareMode && { 
+          compare: 'true', 
+          compareDateRange: compareDateRange 
+        })
+      });
+      
+      const response = await fetch(`/api/analytics?${params}`);
       const result = await response.json();
       
+      if (result.error) {
+        console.error('API Error:', result.error);
+        return;
+      }
+      
       if (result.pages) {
-        const totalSessions = result.totalSessions || 0;
-        const totalConversions = result.totalConversions || 0;
-        const avgRate = totalSessions > 0 ? parseFloat(((totalConversions / totalSessions) * 100).toFixed(1)) : 0;
         const dateLabel = dateRanges.find(d => d.value === dateRange)?.label || 'Last 30 days';
         
-        setData(prevData => ({
-          ...prevData,
+        setData({
           metrics: [
-            { title: 'Total Sessions', value: totalSessions.toLocaleString(), trend: 12.3, subtitle: dateLabel },
-            { title: 'Conversions', value: totalConversions.toLocaleString(), trend: 8.7, subtitle: dateLabel },
-            { title: 'Conversion Rate', value: `${avgRate}%`, trend: -2.1, subtitle: dateLabel },
-            { title: 'Top Page Views', value: result.topPageViews.toLocaleString(), trend: 15.4, subtitle: result.topPagePath }
+            { 
+              title: 'Total Sessions', 
+              value: result.totalSessions.toLocaleString(), 
+              trend: 12.3, 
+              subtitle: dateLabel 
+            },
+            { 
+              title: 'Conversions', 
+              value: result.totalConversions.toLocaleString(), 
+              trend: 8.7, 
+              subtitle: `${result.totalConversions} leads generated` 
+            },
+            { 
+              title: 'Conversion Rate', 
+              value: `${result.overallConversionRate}%`, 
+              trend: compareMode ? 0 : -2.1, 
+              subtitle: 'Overall site performance' 
+            },
+            { 
+              title: 'Total Users', 
+              value: result.totalUsers.toLocaleString(), 
+              trend: 15.4, 
+              subtitle: `${result.totalUsers} unique visitors` 
+            }
           ],
-          topPages: result.pages || [],
-          convertingPages: result.pages
-            .filter(page => page.conversions > 0)
-            .sort((a, b) => b.conversions - a.conversions)
-            .slice(0, 4)
-            .map(page => ({
-              page: page.page,
-              conversions: page.conversions,
-              sessions: page.sessions,
-              rate: page.rate
-            })),
+          pages: result.pages || [],
+          topConvertingPages: result.topConvertingPages || [],
           blogPosts: result.blogPosts.length > 0 ? result.blogPosts : [],
-          funnelData: result.funnelData || {},
+          categoryPerformance: result.categoryPerformance || {},
+          highTrafficLowConversion: result.highTrafficLowConversion || [],
+          hasComparison: result.hasComparison || false,
           debugInfo: result.debugInfo || null
-        }));
+        });
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -77,12 +103,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-  }, [dateRange]);
+  }, [dateRange, compareMode, compareDateRange]);
 
   if (loading) {
     return (
       <div className="min-h-screen p-6 flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading analytics data...</div>
+        <div className="text-xl text-gray-600">Loading conversion analysis...</div>
       </div>
     );
   }
@@ -92,8 +118,8 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Marketing Analytics Dashboard</h1>
-          <p className="text-gray-600 mb-4">Clean insights into what's working and what isn't</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">🎯 Conversion Analysis Dashboard</h1>
+          <p className="text-gray-600 mb-4">Actionable insights into what's driving conversions and what needs optimization</p>
           <div className="flex items-center gap-4">
             <div className="relative">
               <button 
@@ -122,6 +148,21 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+            
+            <button 
+              onClick={() => setCompareMode(!compareMode)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                compareMode 
+                  ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                  : 'bg-white border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4" />
+              <span className="text-sm font-medium">
+                {compareMode ? 'Comparing Periods' : 'Compare Periods'}
+              </span>
+            </button>
+
             <button className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50">
               <Filter className="w-4 h-4" />
               <span className="text-sm font-medium">Filters</span>
@@ -138,19 +179,50 @@ export default function Dashboard() {
 
         {/* Top Pages */}
         <div className="mb-6">
-          <TopPages data={data.topPages} />
+          <TopPages data={data.pages} showComparison={data.hasComparison} />
         </div>
 
-        {/* Two Column Layout */}
+        {/* Two Column Layout - Converting Pages & Blog Posts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <ConvertingPages 
+            data={data.topConvertingPages} 
+            showComparison={data.hasComparison} 
+          />
           <BlogPosts data={data.blogPosts} />
-          <ConvertingPages data={data.convertingPages} />
         </div>
 
-        {/* Funnel */}
+        {/* Category Performance Analysis */}
         <div className="mb-6">
-          <FunnelChart funnelData={data.funnelData} debugInfo={data.debugInfo} />
+          <CategoryPerformance 
+            categoryPerformance={data.categoryPerformance}
+            highTrafficLowConversion={data.highTrafficLowConversion}
+          />
         </div>
+
+        {/* Debug Info - Remove in production */}
+        {data.debugInfo && (
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-900 mb-2">📊 Analysis Summary</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
+              <div>
+                <span className="font-medium">{data.debugInfo.totalPagesAnalyzed}</span>
+                <p className="text-xs">Pages analyzed</p>
+              </div>
+              <div>
+                <span className="font-medium">{data.debugInfo.totalConversionsTracked}</span>
+                <p className="text-xs">Conversions tracked</p>
+              </div>
+              <div>
+                <span className="font-medium">{data.debugInfo.categoriesFound?.length || 0}</span>
+                <p className="text-xs">Content categories</p>
+              </div>
+              <div>
+                <span className="font-medium">{data.debugInfo.dateRange}</span>
+                <p className="text-xs">Analysis period</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

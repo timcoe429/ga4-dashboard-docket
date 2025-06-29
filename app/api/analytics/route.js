@@ -4,6 +4,8 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const dateRange = searchParams.get('dateRange') || '30daysAgo';
+    const compareMode = searchParams.get('compare') === 'true';
+    const compareDateRange = searchParams.get('compareDateRange') || '60daysAgo';
     
     const propertyId = process.env.GA4_PROPERTY_ID;
     
@@ -14,71 +16,64 @@ export async function GET(request) {
       },
     });
 
-    // Get page data with filters to exclude customer login traffic
-    const [pagesResponse] = await analyticsDataClient.runReport({
+    // Helper function to normalize page paths for grouping
+    function normalizePage(pagePath) {
+      if (!pagePath || pagePath === '/' || pagePath === '' || pagePath === '/index' || pagePath === '/home') {
+        return '/';
+      }
+      let normalized = pagePath.split('?')[0];
+      normalized = normalized.replace(/\/$/, '') || '/';
+      return normalized;
+    }
+
+    // Helper function to categorize pages
+    function categorizePage(pagePath) {
+      if (pagePath === '/') return 'Homepage';
+      if (pagePath.includes('/blog')) return 'Blog';
+      if (pagePath.includes('/pricing') || pagePath.includes('/plans')) return 'Pricing';
+      if (pagePath.includes('software') || pagePath.includes('dumpster') || pagePath.includes('junk')) return 'Product';
+      if (pagePath.includes('/about') || pagePath.includes('/contact')) return 'Company';
+      return 'Other';
+    }
+
+    // Helper function to extract readable titles
+    function extractTitle(pagePath, pageTitle) {
+      if (pageTitle && pageTitle !== '(not set)' && !pageTitle.includes('N/A')) {
+        return pageTitle;
+      }
+      if (pagePath === '/' || pagePath === '') return 'Home Page';
+      const pathParts = pagePath.replace(/^\/+/, '').split('/');
+      const lastPart = pathParts[pathParts.length - 1];
+      return lastPart.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).trim() || 'Untitled Page';
+    }
+
+    // Get current period data
+    const [currentPagesResponse] = await analyticsDataClient.runReport({
       property: `properties/${propertyId}`,
       dateRanges: [{ startDate: dateRange, endDate: 'today' }],
       dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
       metrics: [
         { name: 'screenPageViews' },
-        { name: 'activeUsers' }
+        { name: 'activeUsers' },
+        { name: 'bounceRate' },
+        { name: 'averageSessionDuration' }
       ],
       dimensionFilter: {
         andGroup: {
           expressions: [
-            {
-              notExpression: {
-                filter: {
-                  fieldName: 'pagePath',
-                  stringFilter: {
-                    value: '/__/auth',
-                    matchType: 'CONTAINS'
-                  }
-                }
-              }
-            },
-            {
-              notExpression: {
-                filter: {
-                  fieldName: 'pagePath',
-                  stringFilter: {
-                    value: '/auth/',
-                    matchType: 'CONTAINS'
-                  }
-                }
-              }
-            },
-            {
-              notExpression: {
-                filter: {
-                  fieldName: 'pagePath',
-                  stringFilter: {
-                    value: 'iframe',
-                    matchType: 'CONTAINS'
-                  }
-                }
-              }
-            },
-            {
-              notExpression: {
-                filter: {
-                  fieldName: 'hostName',
-                  stringFilter: {
-                    value: 'app.yourdocket.com',
-                    matchType: 'EXACT'
-                  }
-                }
-              }
-            }
+            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
+            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
+            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
+            { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'app.yourdocket.com', matchType: 'EXACT' } } } }
           ]
         }
       },
-      limit: 50,
+      limit: 100,
       orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }]
     });
 
-    // Get conversion events with same filters
-    const [conversionsResponse] = await analyticsDataClient.runReport({
+    // Get current period conversions
+    const [currentConversionsResponse] = await analyticsDataClient.runReport({
       property: `properties/${propertyId}`,
       dateRanges: [{ startDate: dateRange, endDate: 'today' }],
       dimensions: [{ name: 'pagePath' }],
@@ -86,301 +81,188 @@ export async function GET(request) {
       dimensionFilter: {
         andGroup: {
           expressions: [
-            {
-              filter: {
-                fieldName: 'eventName',
-                stringFilter: {
-                  value: 'generate_lead_docket',
-                  matchType: 'EXACT'
-                }
-              }
-            },
-            {
-              notExpression: {
-                filter: {
-                  fieldName: 'pagePath',
-                  stringFilter: {
-                    value: '/__/auth',
-                    matchType: 'CONTAINS'
-                  }
-                }
-              }
-            },
-            {
-              notExpression: {
-                filter: {
-                  fieldName: 'pagePath',
-                  stringFilter: {
-                    value: '/auth/',
-                    matchType: 'CONTAINS'
-                  }
-                }
-              }
-            },
-            {
-              notExpression: {
-                filter: {
-                  fieldName: 'pagePath',
-                  stringFilter: {
-                    value: 'iframe',
-                    matchType: 'CONTAINS'
-                  }
-                }
-              }
-            },
-            {
-              notExpression: {
-                filter: {
-                  fieldName: 'hostName',
-                  stringFilter: {
-                    value: 'app.yourdocket.com',
-                    matchType: 'EXACT'
-                  }
-                }
-              }
-            }
+            { filter: { fieldName: 'eventName', stringFilter: { value: 'generate_lead_docket', matchType: 'EXACT' } } },
+            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
+            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
+            { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
+            { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'app.yourdocket.com', matchType: 'EXACT' } } } }
           ]
-        }
-      },
-      limit: 20,
-      orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }]
-    });
-
-    // Map conversions by page
-    const conversionsByPage = {};
-    conversionsResponse.rows?.forEach(row => {
-      conversionsByPage[row.dimensionValues[0].value] = parseInt(row.metricValues[0].value) || 0;
-    });
-
-    // Helper function to normalize page paths for grouping
-    function normalizePage(pagePath) {
-      // Normalize home page variations
-      if (!pagePath || pagePath === '/' || pagePath === '' || pagePath === '/index' || pagePath === '/home') {
-        return '/';
-      }
-      
-      // Remove trailing slashes and query parameters for grouping
-      let normalized = pagePath.split('?')[0]; // Remove query params
-      normalized = normalized.replace(/\/$/, '') || '/'; // Remove trailing slash, but keep '/' for root
-      
-      return normalized;
-    }
-
-    // Helper function to extract readable titles from URLs
-    function extractTitle(pagePath, pageTitle) {
-      // Use GA pageTitle if available and meaningful
-      if (pageTitle && pageTitle !== '(not set)' && !pageTitle.includes('N/A')) {
-        return pageTitle;
-      }
-      
-      // Extract title from URL path
-      if (pagePath === '/' || pagePath === '') return 'Home Page';
-      
-      // Remove leading slash and split by slash
-      const pathParts = pagePath.replace(/^\/+/, '').split('/');
-      const lastPart = pathParts[pathParts.length - 1];
-      
-      // Convert URL slug to readable title
-      return lastPart
-        .replace(/-/g, ' ')
-        .replace(/\b\w/g, l => l.toUpperCase())
-        .trim() || 'Untitled Page';
-    }
-
-    // Process pages data and group similar pages
-    const pageGroups = {};
-    pagesResponse.rows?.forEach(row => {
-      const pagePath = row.dimensionValues[0].value;
-      const pageTitle = row.dimensionValues[1]?.value || '';
-      const pageViews = parseInt(row.metricValues[0].value) || 0;
-      const normalizedPath = normalizePage(pagePath);
-      
-      if (!pageGroups[normalizedPath]) {
-        pageGroups[normalizedPath] = {
-          page: normalizedPath,
-          title: extractTitle(normalizedPath, pageTitle),
-          sessions: 0,
-          conversions: 0,
-          originalPaths: []
-        };
-      }
-      
-      pageGroups[normalizedPath].sessions += pageViews;
-      pageGroups[normalizedPath].originalPaths.push(pagePath);
-    });
-
-    // Add conversions to grouped pages
-    Object.keys(conversionsByPage).forEach(pagePath => {
-      const normalizedPath = normalizePage(pagePath);
-      if (pageGroups[normalizedPath]) {
-        pageGroups[normalizedPath].conversions += conversionsByPage[pagePath];
-      }
-    });
-
-    // Convert to array and calculate rates/trends
-    const allPages = Object.values(pageGroups).map(group => ({
-      ...group,
-      rate: group.sessions > 0 ? parseFloat(((group.conversions / group.sessions) * 100).toFixed(1)) : 0,
-      trend: parseFloat((Math.random() * 20 - 10).toFixed(1)) // Random trend for now, replace with actual comparison data
-    })).sort((a, b) => b.sessions - a.sessions);
-
-    // Get blog posts with better filtering
-    const blogPosts = allPages
-      .filter(page => 
-        page.page.includes('/blog') || 
-        page.page.includes('/post') || 
-        page.page.includes('/article') ||
-        page.page.includes('/how-') ||
-        page.page.includes('/guide') ||
-        page.page.includes('/tips')
-      )
-      .slice(0, 4)
-      .map(post => ({
-        ...post,
-        views: post.sessions,
-        title: post.title
-      }));
-
-    // Calculate totals (now properly filtered)
-    const totalSessions = allPages.reduce((sum, page) => sum + page.sessions, 0);
-    const totalConversions = Object.values(conversionsByPage).reduce((sum, val) => sum + val, 0);
-
-    // Get comprehensive funnel data - actual pages and conversions
-    const [funnelPagesResponse] = await analyticsDataClient.runReport({
-      property: `properties/${propertyId}`,
-      dateRanges: [{ startDate: dateRange, endDate: 'today' }],
-      dimensions: [{ name: 'pagePath' }],
-      metrics: [{ name: 'screenPageViews' }],
-      orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
-      limit: 100
-    });
-
-    // Get conversions by page for funnel analysis
-    const [funnelConversionsResponse] = await analyticsDataClient.runReport({
-      property: `properties/${propertyId}`,
-      dateRanges: [{ startDate: dateRange, endDate: 'today' }],
-      dimensions: [{ name: 'pagePath' }],
-      metrics: [{ name: 'eventCount' }],
-      dimensionFilter: {
-        filter: {
-          fieldName: 'eventName',
-          stringFilter: {
-            value: 'generate_lead_docket',
-            matchType: 'EXACT'
-          }
         }
       },
       orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
       limit: 50
     });
 
-    // Process all page data for funnel analysis
-    const allPageData = {};
-    funnelPagesResponse.rows?.forEach(row => {
-      const path = normalizePage(row.dimensionValues[0].value);
-      const views = parseInt(row.metricValues[0].value) || 0;
-      
-      if (!allPageData[path]) {
-        allPageData[path] = { views: 0, conversions: 0 };
+    // Process current period data
+    const currentPageGroups = {};
+    currentPagesResponse.rows?.forEach(row => {
+      const pagePath = row.dimensionValues[0].value;
+      const pageTitle = row.dimensionValues[1]?.value || '';
+      const normalizedPath = normalizePage(pagePath);
+      const pageViews = parseInt(row.metricValues[0].value) || 0;
+      const users = parseInt(row.metricValues[1].value) || 0;
+      const bounceRate = parseFloat(row.metricValues[2].value) || 0;
+      const avgDuration = parseFloat(row.metricValues[3].value) || 0;
+
+      if (!currentPageGroups[normalizedPath]) {
+        currentPageGroups[normalizedPath] = {
+          page: normalizedPath,
+          title: extractTitle(normalizedPath, pageTitle),
+          category: categorizePage(normalizedPath),
+          sessions: 0,
+          users: 0,
+          bounceRate: 0,
+          avgDuration: 0,
+          conversions: 0
+        };
       }
-      allPageData[path].views += views;
+
+      currentPageGroups[normalizedPath].sessions += pageViews;
+      currentPageGroups[normalizedPath].users += users;
+      currentPageGroups[normalizedPath].bounceRate = bounceRate;
+      currentPageGroups[normalizedPath].avgDuration = avgDuration;
     });
 
     // Add conversion data
-    funnelConversionsResponse.rows?.forEach(row => {
-      const path = normalizePage(row.dimensionValues[0].value);
+    const currentConversions = {};
+    currentConversionsResponse.rows?.forEach(row => {
+      const pagePath = normalizePage(row.dimensionValues[0].value);
       const conversions = parseInt(row.metricValues[0].value) || 0;
-      
-      if (!allPageData[path]) {
-        allPageData[path] = { views: 0, conversions: 0 };
+      currentConversions[pagePath] = conversions;
+      if (currentPageGroups[pagePath]) {
+        currentPageGroups[pagePath].conversions = conversions;
       }
-      allPageData[path].conversions += conversions;
     });
 
-    // Define your actual funnels based on real paths
-    const realFunnels = {
-      homeToDemo: {
-        name: 'Home → Pricing → Demo',
-        steps: [
-          { name: 'Home Page', path: '/' },
-          { name: 'Pricing Page', path: '/pricing' },  // We'll find the actual pricing page
-          { name: 'Demo Conversion', path: '/', isConversion: true }
-        ]
-      },
-      dumpsterSoftware: {
-        name: 'Dumpster Software → Demo',
-        steps: [
-          { name: 'Dumpster Software', path: '/dumpster-rental-software' },
-          { name: 'Demo Conversion', path: '/dumpster-rental-software', isConversion: true }
-        ]
-      },
-      junkSoftware: {
-        name: 'Junk Software → Demo',
-        steps: [
-          { name: 'Junk Software', path: '/junk-removal-software' },
-          { name: 'Demo Conversion', path: '/junk-removal-software', isConversion: true }
-        ]
-      }
-    };
+    // Calculate performance metrics
+    const currentPages = Object.values(currentPageGroups).map(page => ({
+      ...page,
+      conversionRate: page.sessions > 0 ? parseFloat(((page.conversions / page.sessions) * 100).toFixed(2)) : 0,
+      conversionValue: page.conversions * 50, // Assume $50 per conversion for value calculation
+      engagementScore: page.sessions > 0 ? parseFloat((((1 - page.bounceRate/100) * page.avgDuration/60) * 100).toFixed(1)) : 0
+    })).sort((a, b) => b.conversionRate - a.conversionRate);
 
-    // Find actual pricing page from your data
-    const pricingPages = Object.keys(allPageData).filter(path => 
-      path.includes('pricing') || path.includes('plans') || path.includes('cost')
-    );
-    
-    if (pricingPages.length > 0) {
-      realFunnels.homeToDemo.steps[1].path = pricingPages[0];
+    // Get comparison data if requested
+    let comparisonData = null;
+    if (compareMode) {
+      // Get comparison period data (similar logic)
+      const [comparePagesResponse] = await analyticsDataClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [{ startDate: compareDateRange, endDate: dateRange.replace('daysAgo', 'daysAgo') }],
+        dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
+        metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }],
+        dimensionFilter: {
+          andGroup: {
+            expressions: [
+              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
+              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
+              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
+              { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'app.yourdocket.com', matchType: 'EXACT' } } } }
+            ]
+          }
+        },
+        limit: 100,
+        orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }]
+      });
+
+      const [compareConversionsResponse] = await analyticsDataClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [{ startDate: compareDateRange, endDate: dateRange.replace('daysAgo', 'daysAgo') }],
+        dimensions: [{ name: 'pagePath' }],
+        metrics: [{ name: 'eventCount' }],
+        dimensionFilter: {
+          andGroup: {
+            expressions: [
+              { filter: { fieldName: 'eventName', stringFilter: { value: 'generate_lead_docket', matchType: 'EXACT' } } },
+              { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } }
+            ]
+          }
+        },
+        limit: 50
+      });
+
+      // Process comparison data (simplified for space)
+      const comparePageGroups = {};
+      comparePagesResponse.rows?.forEach(row => {
+        const normalizedPath = normalizePage(row.dimensionValues[0].value);
+        const pageViews = parseInt(row.metricValues[0].value) || 0;
+        if (!comparePageGroups[normalizedPath]) {
+          comparePageGroups[normalizedPath] = { sessions: 0, conversions: 0 };
+        }
+        comparePageGroups[normalizedPath].sessions += pageViews;
+      });
+
+      compareConversionsResponse.rows?.forEach(row => {
+        const normalizedPath = normalizePage(row.dimensionValues[0].value);
+        const conversions = parseInt(row.metricValues[0].value) || 0;
+        if (!comparePageGroups[normalizedPath]) {
+          comparePageGroups[normalizedPath] = { sessions: 0, conversions: 0 };
+        }
+        comparePageGroups[normalizedPath].conversions = conversions;
+      });
+
+      comparisonData = comparePageGroups;
     }
 
-    // Build funnel data with real numbers
-    const processedFunnels = {};
-    
-    Object.keys(realFunnels).forEach(funnelKey => {
-      const funnel = realFunnels[funnelKey];
-      const processedSteps = [];
-      
-      funnel.steps.forEach((step, index) => {
-        const pageData = allPageData[step.path] || { views: 0, conversions: 0 };
-        
-        if (step.isConversion) {
-          // For conversion steps, use conversion count
-          processedSteps.push({
-            step: step.name,
-            users: pageData.conversions,
-            rate: processedSteps.length > 0 && processedSteps[0].users > 0 ? 
-              parseFloat(((pageData.conversions / processedSteps[0].users) * 100).toFixed(1)) : 0
-          });
-        } else {
-          // For view steps, use page views
-          processedSteps.push({
-            step: step.name,
-            users: pageData.views,
-            rate: index === 0 ? 100 : (processedSteps.length > 0 && processedSteps[0].users > 0 ? 
-              parseFloat(((pageData.views / processedSteps[0].users) * 100).toFixed(1)) : 0)
-          });
-        }
-      });
-      
-      processedFunnels[funnelKey] = {
-        name: funnel.name,
-        steps: processedSteps
-      };
+    // Calculate trends if comparison data available
+    const pagesWithTrends = currentPages.map(page => {
+      let trend = 0;
+      if (comparisonData && comparisonData[page.page]) {
+        const currentRate = page.conversionRate;
+        const previousRate = comparisonData[page.page].sessions > 0 ? 
+          (comparisonData[page.page].conversions / comparisonData[page.page].sessions) * 100 : 0;
+        trend = previousRate > 0 ? parseFloat(((currentRate - previousRate) / previousRate * 100).toFixed(1)) : 0;
+      }
+      return { ...page, trend };
     });
 
-    return Response.json({ 
-      pages: allPages.slice(0, 10),
-      blogPosts: blogPosts.length > 0 ? blogPosts : [],
-      totalConversions: totalConversions,
-      totalSessions: totalSessions,
-      topPageViews: allPages[0]?.sessions || 0,
-      topPagePath: allPages[0]?.page || 'No data',
-      funnelData: processedFunnels,
-      // Debug info to help troubleshoot
+    // Calculate totals
+    const totalSessions = currentPages.reduce((sum, page) => sum + page.sessions, 0);
+    const totalConversions = currentPages.reduce((sum, page) => sum + page.conversions, 0);
+    const totalUsers = currentPages.reduce((sum, page) => sum + page.users, 0);
+
+    // Category performance
+    const categoryPerformance = {};
+    currentPages.forEach(page => {
+      if (!categoryPerformance[page.category]) {
+        categoryPerformance[page.category] = { sessions: 0, conversions: 0, pages: 0 };
+      }
+      categoryPerformance[page.category].sessions += page.sessions;
+      categoryPerformance[page.category].conversions += page.conversions;
+      categoryPerformance[page.category].pages += 1;
+    });
+
+    Object.keys(categoryPerformance).forEach(category => {
+      const data = categoryPerformance[category];
+      data.conversionRate = data.sessions > 0 ? parseFloat(((data.conversions / data.sessions) * 100).toFixed(2)) : 0;
+    });
+
+    return Response.json({
+      // Core data
+      pages: pagesWithTrends.slice(0, 20),
+      totalSessions,
+      totalConversions,
+      totalUsers,
+      overallConversionRate: totalSessions > 0 ? parseFloat(((totalConversions / totalSessions) * 100).toFixed(2)) : 0,
+      
+      // Analysis data
+      topConvertingPages: pagesWithTrends.filter(p => p.conversions > 0).slice(0, 10),
+      highTrafficLowConversion: pagesWithTrends.filter(p => p.sessions > 100 && p.conversionRate < 1).slice(0, 5),
+      categoryPerformance,
+      
+      // Blog specific
+      blogPosts: pagesWithTrends.filter(p => p.category === 'Blog').slice(0, 6),
+      
+      // Comparison data
+      hasComparison: compareMode,
+      comparisonPeriod: compareMode ? `${compareDateRange} to ${dateRange}` : null,
+      
+      // Debug
       debugInfo: {
-        totalPagesFound: Object.keys(allPageData).length,
-        topPages: Object.keys(allPageData).slice(0, 10),
-        conversionsFound: Object.values(allPageData).reduce((sum, page) => sum + page.conversions, 0),
-        pricingPagesFound: pricingPages
+        totalPagesAnalyzed: currentPages.length,
+        totalConversionsTracked: Object.values(currentConversions).reduce((sum, conv) => sum + conv, 0),
+        categoriesFound: Object.keys(categoryPerformance),
+        dateRange: `${dateRange} to today`
       }
     });
     
