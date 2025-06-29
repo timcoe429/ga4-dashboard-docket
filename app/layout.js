@@ -1,5 +1,5 @@
 import './globals.css'
-import AuthSessionProvider from '@/components/SessionProvider'
+import AuthSessionProvider from '../components/SessionProvider'
 
 export const metadata = {
   title: 'GA4 Dashboard',
