@@ -41,7 +41,11 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
               {topPaths.map((path, index) => (
                 <div 
                   key={index} 
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all cursor-pointer"
+                  className={`border rounded-lg p-4 transition-all cursor-pointer ${
+                    selectedJourney === index 
+                      ? 'border-blue-400 shadow-lg shadow-blue-200 bg-blue-50' 
+                      : 'border-gray-200 hover:shadow-md hover:border-gray-300'
+                  }`}
                   onClick={() => setSelectedJourney(selectedJourney === index ? null : index)}
                 >
                   <div className="flex items-center justify-between mb-2">
