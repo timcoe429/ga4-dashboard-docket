@@ -1,11 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Calendar, TrendingUp } from 'lucide-react';
+import { Calendar, TrendingUp, BarChart3, Users, Target, RefreshCw } from 'lucide-react';
 import MetricCard from '../components/MetricCard';
 import TopPages from '../components/TopPages';
 import ConvertingPages from '../components/ConvertingPages';
 import BlogPosts from '../components/BlogPosts';
 import CategoryPerformance from '../components/CategoryPerformance';
+import ConversionFunnel from '../components/ConversionFunnel';
+import UserJourneyMap from '../components/UserJourneyMap';
+import ABTestingDashboard from '../components/ABTestingDashboard';
 
 export default function Dashboard() {
   const [dateRange, setDateRange] = useState('30daysAgo');
@@ -89,6 +92,10 @@ export default function Dashboard() {
           blogPosts: result.blogPosts.length > 0 ? result.blogPosts : [],
           categoryPerformance: result.categoryPerformance || {},
           highTrafficLowConversion: result.highTrafficLowConversion || [],
+          // 🚀 NEW ADVANCED ANALYTICS DATA
+          funnelData: result.funnelData || [],
+          journeyData: result.journeyData || { topPaths: [], assistingPages: [], completingPages: [], journeyInsights: {} },
+          abTestData: result.abTestData || { activeTests: [], completedTests: [], testingSummary: {} },
           hasComparison: result.hasComparison || false,
           debugInfo: result.debugInfo || null
         });
@@ -178,29 +185,56 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Top Pages */}
-        <div className="mb-6">
-          <TopPages data={data.pages} showComparison={data.hasComparison} />
-        </div>
-
-        {/* Two Column Layout - Converting Pages & Blog Posts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Top Pages & Converting Pages */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+          <TopPages 
+            pages={data.pages} 
+            showComparison={compareMode}
+          />
           <ConvertingPages 
-            data={data.topConvertingPages} 
-            showComparison={data.hasComparison} 
-          />
-          <BlogPosts 
-            data={data.blogPosts} 
-            showComparison={data.hasComparison}
+            pages={data.topConvertingPages} 
+            showComparison={compareMode}
           />
         </div>
 
-        {/* Category Performance Analysis */}
-        <div className="mb-6">
+        {/* Blog Posts and Category Performance */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+          <BlogPosts 
+            blogPosts={data.blogPosts} 
+            showComparison={compareMode}
+          />
           <CategoryPerformance 
-            categoryPerformance={data.categoryPerformance}
+            categoryData={data.categoryPerformance}
             highTrafficLowConversion={data.highTrafficLowConversion}
           />
+        </div>
+
+        {/* ✨ NEW ADVANCED ANALYTICS SECTION ✨ */}
+        <div className="mb-8">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">🚀 Advanced Conversion Intelligence</h2>
+            <p className="text-gray-600">Deep-dive analytics for optimization opportunities</p>
+          </div>
+          
+          {/* Conversion Funnel - Full Width */}
+          <div className="mb-8">
+            <ConversionFunnel 
+              funnelData={data.funnelData} 
+              showComparison={compareMode}
+            />
+          </div>
+
+          {/* User Journey and A/B Testing Side by Side */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+            <UserJourneyMap 
+              journeyData={data.journeyData} 
+              showComparison={compareMode}
+            />
+            <ABTestingDashboard 
+              abTestData={data.abTestData} 
+              showComparison={compareMode}
+            />
+          </div>
         </div>
 
         {/* Debug Info - Remove in production */}
