@@ -9,25 +9,27 @@ export default function CategoryPerformance({ categoryPerformance, highTrafficLo
   if (!categoryPerformance || Object.keys(categoryPerformance).length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Category Performance Analysis</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">⚡ Optimization Opportunities</h2>
         <div className="text-center py-8">
-          <p className="text-gray-500">Loading category data...</p>
+          <p className="text-gray-500">Loading optimization data...</p>
         </div>
       </div>
     );
   }
 
-  const categoryData = Object.keys(categoryPerformance).map(category => ({
-    category,
-    ...categoryPerformance[category]
-  })).sort((a, b) => b.conversionRate - a.conversionRate);
+  const categoryData = Object.keys(categoryPerformance)
+    .filter(category => category !== 'Other') // Remove "Other" category
+    .map(category => ({
+      category,
+      ...categoryPerformance[category]
+    })).sort((a, b) => b.conversionRate - a.conversionRate);
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Content Performance Analysis</h2>
+        <h2 className="text-xl font-semibold text-gray-900">⚡ Optimization Opportunities</h2>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
@@ -39,6 +41,40 @@ export default function CategoryPerformance({ categoryPerformance, highTrafficLo
       
       {isExpanded && (
         <>
+          {/* High Traffic, Low Conversion Opportunities - FEATURED */}
+          {highTrafficLowConversion && highTrafficLowConversion.length > 0 && (
+            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h3 className="text-lg font-medium text-yellow-800 mb-3">🎯 Priority Optimization Targets</h3>
+              <p className="text-sm text-yellow-700 mb-4">High traffic pages with low conversion rates - your biggest opportunities:</p>
+              <div className="space-y-3">
+                {highTrafficLowConversion.map((page, i) => (
+                  <div key={i} className="flex justify-between items-center p-3 bg-white rounded border">
+                    <div>
+                      <span className="text-yellow-900 font-medium">{page.title}</span>
+                      <div className="text-xs text-yellow-700 mt-1">{page.page}</div>
+                    </div>
+                    <div className="flex gap-4 text-sm">
+                      <div className="text-right">
+                        <div className="font-bold text-yellow-800">{page.sessions.toLocaleString()}</div>
+                        <div className="text-xs text-yellow-600">sessions</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-red-600">{page.conversionRate}%</div>
+                        <div className="text-xs text-red-500">conv rate</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-green-600">
+                          {Math.round(page.sessions * 0.02 - page.conversions)}
+                        </div>
+                        <div className="text-xs text-green-500">potential conv.</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Category Conversion Rates */}
             <div>
@@ -86,61 +122,23 @@ export default function CategoryPerformance({ categoryPerformance, highTrafficLo
             </div>
           </div>
 
-          {/* Category Stats Table */}
-          <div className="mt-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Detailed Performance</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left text-sm text-gray-500 border-b">
-                    <th className="pb-3 font-medium">Content Type</th>
-                    <th className="pb-3 font-medium text-right">Sessions</th>
-                    <th className="pb-3 font-medium text-right">Conversions</th>
-                    <th className="pb-3 font-medium text-right">Conv. Rate</th>
-                    <th className="pb-3 font-medium text-right">Pages</th>
-                    <th className="pb-3 font-medium text-right">Avg Conv/Page</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categoryData.map((category, i) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="py-3 text-sm font-medium text-gray-900">{category.category}</td>
-                      <td className="py-3 text-sm text-gray-600 text-right">{category.sessions.toLocaleString()}</td>
-                      <td className="py-3 text-sm text-gray-600 text-right">{category.conversions.toLocaleString()}</td>
-                      <td className="py-3 text-sm font-medium text-right">
-                        <span className={`${category.conversionRate > 2 ? 'text-green-600' : category.conversionRate > 1 ? 'text-yellow-600' : 'text-red-600'}`}>
-                          {category.conversionRate}%
-                        </span>
-                      </td>
-                      <td className="py-3 text-sm text-gray-600 text-right">{category.pages}</td>
-                      <td className="py-3 text-sm text-gray-600 text-right">
-                        {(category.conversions / category.pages).toFixed(1)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* High Traffic, Low Conversion Opportunities */}
-          {highTrafficLowConversion && highTrafficLowConversion.length > 0 && (
-            <div className="mt-6 p-4 bg-yellow-50 rounded-lg">
-              <h3 className="text-lg font-medium text-yellow-800 mb-3">⚡ Optimization Opportunities</h3>
-              <p className="text-sm text-yellow-700 mb-3">High traffic pages with low conversion rates - prime for optimization:</p>
-              <div className="space-y-2">
-                {highTrafficLowConversion.map((page, i) => (
-                  <div key={i} className="flex justify-between items-center text-sm">
-                    <span className="text-yellow-800 font-medium">{page.title}</span>
-                    <div className="flex gap-4 text-yellow-700">
-                      <span>{page.sessions.toLocaleString()} sessions</span>
-                      <span className="font-medium">{page.conversionRate}% conv rate</span>
-                    </div>
+          {/* Quick Category Insights */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {categoryData.slice(0, 3).map((category, i) => (
+              <div key={i} className="p-4 bg-gray-50 rounded-lg">
+                <div className="text-sm font-medium text-gray-900 mb-1">{category.category}</div>
+                <div className="flex justify-between items-center">
+                  <div className="text-xs text-gray-500">{category.sessions.toLocaleString()} sessions</div>
+                  <div className={`text-sm font-bold ${
+                    category.conversionRate > 2 ? 'text-green-600' : 
+                    category.conversionRate > 1 ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {category.conversionRate}%
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </>
       )}
     </div>
