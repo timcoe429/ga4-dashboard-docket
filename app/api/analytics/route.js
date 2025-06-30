@@ -21,12 +21,14 @@ export async function GET(request) {
       docket: {
         propertyId: process.env.GA4_PROPERTY_ID,
         conversionEvent: 'generate_lead_docket',
+        includeDomains: ['yourdocket.com'],
         excludeDomains: ['app.yourdocket.com'],
         displayName: 'Docket'
       },
       servicecore: {
         propertyId: '321097999',
         conversionEvent: 'generate_lead',
+        includeDomains: ['servicecore.com'],
         excludeDomains: ['app.servicecore.com'],
         displayName: 'ServiceCore'
       }
@@ -42,6 +44,7 @@ export async function GET(request) {
     console.log('  - displayName:', currentConfig.displayName);
     console.log('  - propertyId:', currentConfig.propertyId);
     console.log('  - conversionEvent:', currentConfig.conversionEvent);
+    console.log('  - includeDomains:', currentConfig.includeDomains);
     console.log('  - excludeDomains:', currentConfig.excludeDomains);
 
     const analyticsDataClient = new BetaAnalyticsDataClient({
@@ -107,15 +110,34 @@ export async function GET(request) {
       return cleanPath.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || 'Page';
     }
 
-    // Build domain filter expressions
+    // Build domain filter expressions - CRITICAL: Include ONLY the correct domain first
     const domainFilterExpressions = [
-      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
-      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
-      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
+      // FIRST: Include ONLY the specified domain(s) for this property
+      ...(currentConfig.includeDomains.length === 1 ? [
+        { filter: { fieldName: 'hostName', stringFilter: { value: currentConfig.includeDomains[0], matchType: 'EXACT' } } }
+      ] : [
+        {
+          orGroup: {
+            expressions: currentConfig.includeDomains.map(domain => ({
+              filter: { fieldName: 'hostName', stringFilter: { value: domain, matchType: 'EXACT' } }
+            }))
+          }
+        }
+      ]),
+      // THEN: Exclude specific subdomains within that domain
       ...currentConfig.excludeDomains.map(domain => ({
         notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: domain, matchType: 'EXACT' } } }
-      }))
+      })),
+      // FINALLY: Exclude auth/admin paths
+      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
+      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
+      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } }
     ];
+
+    console.log('🔒 Domain Filter Debug:');
+    console.log('  - Include domains:', currentConfig.includeDomains);
+    console.log('  - Exclude domains:', currentConfig.excludeDomains);
+    console.log('  - Filter expressions count:', domainFilterExpressions.length);
 
     // Get current period data
     console.log('📊 Making GA4 API call for pages data...');
@@ -143,6 +165,13 @@ export async function GET(request) {
     console.log('📈 Pages API Response:');
     console.log('  - Rows returned:', currentPagesResponse.rows?.length || 0);
     console.log('  - Sample data:', currentPagesResponse.rows?.[0]);
+    
+    // Debug: Check what domains are actually coming back
+    if (currentPagesResponse.rows?.length > 0) {
+      const samplePaths = currentPagesResponse.rows.slice(0, 5).map(row => row.dimensionValues[0].value);
+      console.log('  - Sample page paths:', samplePaths);
+      console.log('  - Expected domain:', currentConfig.includeDomains[0]);
+    }
 
     // Get current period conversions
     console.log('🎯 Making GA4 API call for conversions data...');
@@ -171,9 +200,24 @@ export async function GET(request) {
 
     // Process current period data
     const currentPageGroups = {};
+    const expectedDomain = currentConfig.includeDomains[0];
+    
     currentPagesResponse.rows?.forEach(row => {
       const pagePath = row.dimensionValues[0].value;
       const pageTitle = row.dimensionValues[1]?.value || '';
+      
+      // CRITICAL: Verify we're not getting wrong domain data
+      if (property === 'docket' && (pagePath.includes('servicecore') || pageTitle.toLowerCase().includes('servicecore'))) {
+        console.error('🚨 DOMAIN BLEED DETECTED: Docket dashboard showing ServiceCore data!');
+        console.error('  - Page path:', pagePath);
+        console.error('  - Page title:', pageTitle);
+      }
+      if (property === 'servicecore' && (pagePath.includes('docket') || pageTitle.toLowerCase().includes('docket'))) {
+        console.error('🚨 DOMAIN BLEED DETECTED: ServiceCore dashboard showing Docket data!');
+        console.error('  - Page path:', pagePath);
+        console.error('  - Page title:', pageTitle);
+      }
+      
       const normalizedPath = normalizePage(pagePath);
       const pageViews = parseInt(row.metricValues[0].value) || 0;
       const users = parseInt(row.metricValues[1].value) || 0;
@@ -236,7 +280,8 @@ export async function GET(request) {
         compareEndDate = dateRange.replace('daysAgo', 'daysAgo');
       }
 
-      // Get comparison period data
+      // Get comparison period data with SAME domain filtering
+      console.log('🔄 Making comparison API calls with domain filtering...');
       const [comparePagesResponse] = await analyticsDataClient.runReport({
         property: `properties/${currentConfig.propertyId}`,
         dateRanges: [{ startDate: compareStartDate, endDate: compareEndDate }],
@@ -272,6 +317,8 @@ export async function GET(request) {
         orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
         limit: 50
       });
+
+      console.log('🔄 Comparison data rows:', comparePagesResponse.rows?.length || 0);
 
       // Process comparison data
       const comparePageGroups = {};
