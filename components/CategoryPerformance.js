@@ -1,5 +1,4 @@
 'use client';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 
@@ -23,8 +22,6 @@ export default function CategoryPerformance({ categoryPerformance, highTrafficLo
       category,
       ...categoryPerformance[category]
     })).sort((a, b) => b.conversionRate - a.conversionRate);
-
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -75,52 +72,7 @@ export default function CategoryPerformance({ categoryPerformance, highTrafficLo
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Category Conversion Rates */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Conversion Rate by Content Type</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={categoryData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="category" tick={{ fontSize: 12 }} />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value, name) => [
-                      name === 'conversionRate' ? `${value}%` : value,
-                      name === 'conversionRate' ? 'Conversion Rate' : name
-                    ]}
-                  />
-                  <Bar dataKey="conversionRate" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
 
-            {/* Traffic Distribution */}
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Traffic Distribution</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={categoryData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={80}
-                    paddingAngle={2}
-                    dataKey="sessions"
-                  >
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value, name) => [value.toLocaleString(), 'Sessions']}
-                    labelFormatter={(label) => `${label} Content`}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
 
           {/* Quick Category Insights */}
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">

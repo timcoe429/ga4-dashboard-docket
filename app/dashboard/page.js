@@ -247,7 +247,7 @@ export default function Dashboard() {
               {data.blogPosts?.[0]?.sessions?.toLocaleString() || '0'} top sessions
             </div>
           </div>
-        );
+                );
       case 'category':
         return (
           <div className="bg-orange-50 p-3 rounded-lg mt-3">
@@ -651,21 +651,17 @@ export default function Dashboard() {
 
         {visibleSections.blog && visibleSections.category && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
-            {visibleSections.blog && (
-              <BlogPosts data={data.blogPosts} showComparison={compareMode} />
-            )}
-            {visibleSections.category && (
-              <CategoryPerformance 
-                categoryPerformance={data.categoryPerformance}
-                highTrafficLowConversion={data.highTrafficLowConversion}
-              />
-            )}
+            <BlogPosts data={data.blogPosts} showComparison={true} />
+            <CategoryPerformance 
+              categoryPerformance={data.categoryPerformance}
+              highTrafficLowConversion={data.highTrafficLowConversion}
+            />
           </div>
         )}
 
         {(visibleSections.blog && !visibleSections.category) && (
           <div className="mb-8">
-            <BlogPosts data={data.blogPosts} showComparison={compareMode} />
+            <BlogPosts data={data.blogPosts} showComparison={true} />
           </div>
         )}
 
@@ -677,6 +673,8 @@ export default function Dashboard() {
             />
           </div>
         )}
+
+
 
         {visibleSections.userJourney && (
           <div className="mb-8">
@@ -701,29 +699,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {data.debugInfo && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">📊 Analysis Summary - {currentProp?.domain}</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
-              <div>
-                <span className="font-medium">{data.debugInfo.totalPagesAnalyzed}</span>
-                <p className="text-xs">Pages analyzed</p>
-              </div>
-              <div>
-                <span className="font-medium">{data.debugInfo.totalConversionsTracked}</span>
-                <p className="text-xs">Conversions tracked</p>
-              </div>
-              <div>
-                <span className="font-medium">{data.debugInfo.categoriesFound?.length || 0}</span>
-                <p className="text-xs">Content categories</p>
-              </div>
-              <div>
-                <span className="font-medium">{data.debugInfo.dateRange}</span>
-                <p className="text-xs">Analysis period</p>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Footer */}
         <AmericanFooter />
