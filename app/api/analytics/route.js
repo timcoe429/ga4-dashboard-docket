@@ -585,24 +585,23 @@ export async function GET(request) {
       }
     };
 
-    // User Journey Analysis - ALWAYS SHOW LOGICAL PATHS + Real data if available
+    // User Journey Analysis - Hybrid: Real tracked journeys + Known funnels
     const calculateUserJourneys = async (pages) => {
-      // Get real time-to-convert data
+      // Get real time-to-convert data from database
       const timeMetrics = await calculateTimeToConvertMetrics(property);
       
-      console.log('🔍 DEBUGGING JOURNEY LOGIC:');
-      console.log('  - Real journeys found:', timeMetrics.conversionJourneys.length);
-      console.log('  - Will use:', timeMetrics.conversionJourneys.length > 0 ? 'REAL DATA ONLY' : 'LOGICAL PATHS');
+      console.log('🔍 Journey Analysis:');
+      console.log('  - Real tracked journeys found:', timeMetrics.conversionJourneys.length);
       
-      // FOR NOW: ALWAYS use logical journey paths to get them working
-      console.log('  - FORCING LOGICAL PATHS to debug the issue');
+      // If we have real tracked journey data, use it
+      if (timeMetrics.conversionJourneys.length > 0) {
+        console.log('  - Using REAL tracked journey data from database');
+        return createRealJourneyPaths(timeMetrics, pages, totalSessions, totalConversions);
+      }
+      
+      // Otherwise, show known funnels with real GA4 data
+      console.log('  - Using known funnels with real GA4 data');
       return createLogicalJourneyPaths(pages, totalSessions, totalConversions);
-      
-      // Original logic (commented out for debugging):
-      // if (timeMetrics.conversionJourneys.length > 0) {
-      //   return createRealJourneyPaths(timeMetrics, pages, totalSessions, totalConversions);
-      // }
-      // return createLogicalJourneyPaths(pages, totalSessions, totalConversions);
     };
 
     // Create real journey paths from database tracking data
