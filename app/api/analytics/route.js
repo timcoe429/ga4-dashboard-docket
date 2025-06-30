@@ -530,6 +530,9 @@ export async function GET(request) {
     // Calculate real time-to-convert metrics from database
     const calculateTimeToConvertMetrics = async (property) => {
       try {
+        console.log('🔍 Checking for real journey data in database...');
+        console.log('  - Property:', property);
+        
         // Get average time to convert for this property
         const journeys = await prisma.userJourney.findMany({
           where: { property },
@@ -541,13 +544,18 @@ export async function GET(request) {
           }
         });
 
+        console.log('  - Real journeys found:', journeys.length);
+
         if (journeys.length === 0) {
+          console.log('  - No real journey data found, using logical fallback');
           return {
             avgTimeToConvert: null,
             avgTouchpoints: null,
             conversionJourneys: []
           };
         }
+
+        console.log('  - ✅ Using real journey data from database');
 
         // Calculate averages
         const avgTimeToConvert = journeys.reduce((sum, j) => sum + j.timeToConvertDays, 0) / journeys.length;
@@ -615,25 +623,38 @@ export async function GET(request) {
 
     // Create logical journey paths from GA4 page data
     const createLogicalJourneyPaths = (pages, totalSessions, totalConversions) => {
+      console.log('🔍 Creating logical journey paths...');
+      console.log('  - Total pages:', pages.length);
+      console.log('  - Total sessions:', totalSessions);
+      console.log('  - Total conversions:', totalConversions);
+
       const homePage = pages.find(p => p.page === '/') || null;
-      const blogPosts = pages.filter(p => p.category === 'Blog' && p.sessions > 50).slice(0, 3);
-      const productPages = pages.filter(p => p.category === 'Product' && p.sessions > 20).slice(0, 2);
+      const blogPosts = pages.filter(p => p.category === 'Blog' && p.sessions > 5).slice(0, 5); // Much lower threshold
+      const productPages = pages.filter(p => p.category === 'Product' && p.sessions > 5).slice(0, 3); // Much lower threshold
       const pricingPage = pages.find(p => p.page.includes('pricing')) || null;
-      const convertingPages = pages.filter(p => p.conversions > 0).slice(0, 3);
+      const convertingPages = pages.filter(p => p.conversions > 0).slice(0, 5);
+      const topTrafficPages = pages.filter(p => p.sessions > 10).slice(0, 6); // Get any high-traffic pages
+
+      console.log('  - HomePage found:', !!homePage);
+      console.log('  - Blog posts found:', blogPosts.length);
+      console.log('  - Product pages found:', productPages.length);
+      console.log('  - Pricing page found:', !!pricingPage);
+      console.log('  - Converting pages found:', convertingPages.length);
+      console.log('  - Top traffic pages found:', topTrafficPages.length);
 
       const topPaths = [];
 
-      // Journey 1: Homepage -> Pricing -> Conversion
-      if (homePage && pricingPage && convertingPages[0]) {
+      // Journey 1: Homepage -> Pricing -> Demo Request (Classic B2B SaaS Flow)
+      if (homePage && pricingPage) {
         topPaths.push({
           steps: [
             { page: pathToJourneyName(homePage.page), url: homePage.page, sessions: homePage.sessions },
             { page: pathToJourneyName(pricingPage.page), url: pricingPage.page, sessions: pricingPage.sessions },
-            { page: pathToJourneyName(convertingPages[0].page), url: convertingPages[0].page, sessions: convertingPages[0].sessions }
+            { page: 'Demo Request', url: '/demo', sessions: Math.round(pricingPage.sessions * 0.2) }
           ],
           conversions: Math.round(totalConversions * 0.35),
           users: Math.round(totalSessions * 0.12),
-          sessions: Math.round((homePage.sessions + pricingPage.sessions + convertingPages[0].sessions) / 3),
+          sessions: Math.round((homePage.sessions + pricingPage.sessions) / 2),
           percentage: 35,
           conversionRate: 12.8,
           avgTimeToConvert: null,
@@ -642,45 +663,63 @@ export async function GET(request) {
         });
       }
 
-      // Journey 2: Blog -> Product -> Conversion
-      if (blogPosts[0] && productPages[0] && convertingPages[0]) {
+      // Journey 2: Blog -> Product/Service Info -> Demo Request
+      if (blogPosts.length > 0) {
+        const targetPage = productPages[0] || topTrafficPages[0] || homePage;
+        if (targetPage) {
+          topPaths.push({
+            steps: [
+              { page: pathToJourneyName(blogPosts[0].page), url: blogPosts[0].page, sessions: blogPosts[0].sessions },
+              { page: pathToJourneyName(targetPage.page), url: targetPage.page, sessions: targetPage.sessions },
+              { page: 'Demo Request', url: '/demo', sessions: Math.round(targetPage.sessions * 0.15) }
+            ],
+            conversions: Math.round(totalConversions * 0.25),
+            users: Math.round(totalSessions * 0.08),
+            sessions: Math.round((blogPosts[0].sessions + targetPage.sessions) / 2),
+            percentage: 25,
+            conversionRate: 8.5,
+            avgTimeToConvert: null,
+            avgTouchpoints: null,
+            isRealData: false
+          });
+        }
+      }
+
+      // Journey 3: Direct Demo Request (high-intent visitors)
+      topPaths.push({
+        steps: [
+          { page: 'Demo Request', url: '/demo', sessions: Math.round(totalSessions * 0.15) }
+        ],
+        conversions: Math.round(totalConversions * 0.20),
+        users: Math.round(totalSessions * 0.06),
+        sessions: Math.round(totalSessions * 0.15),
+        percentage: 20,
+        conversionRate: 15.2,
+        avgTimeToConvert: null,
+        avgTouchpoints: null,
+        isRealData: false
+      });
+
+      // Journey 4: Software-specific page -> Demo (if we have product pages)
+      if (productPages.length > 0) {
         topPaths.push({
           steps: [
-            { page: pathToJourneyName(blogPosts[0].page), url: blogPosts[0].page, sessions: blogPosts[0].sessions },
-            { page: pathToJourneyName(productPages[0].page), url: productPages[0].page, sessions: productPages[0].sessions },
-            { page: pathToJourneyName(convertingPages[0].page), url: convertingPages[0].page, sessions: convertingPages[0].sessions }
+            { page: pathToJourneyName(productPages[0].page), url: productPages[0].page, sessions: productPages[0].sessions }
           ],
-          conversions: Math.round(totalConversions * 0.25),
-          users: Math.round(totalSessions * 0.08),
-          sessions: Math.round((blogPosts[0].sessions + productPages[0].sessions + convertingPages[0].sessions) / 3),
-          percentage: 25,
-          conversionRate: 8.5,
+          conversions: Math.round(totalConversions * 0.05),
+          users: Math.round(totalSessions * 0.02),
+          sessions: productPages[0].sessions,
+          percentage: 5,
+          conversionRate: productPages[0].conversionRate || 4.2,
           avgTimeToConvert: null,
           avgTouchpoints: null,
           isRealData: false
         });
       }
 
-      // Journey 3: Direct conversion from top converting page
-      if (convertingPages[0]) {
-        topPaths.push({
-          steps: [
-            { page: pathToJourneyName(convertingPages[0].page), url: convertingPages[0].page, sessions: convertingPages[0].sessions }
-          ],
-          conversions: Math.round(totalConversions * 0.20),
-          users: Math.round(totalSessions * 0.06),
-          sessions: convertingPages[0].sessions,
-          percentage: 20,
-          conversionRate: convertingPages[0].conversionRate,
-          avgTimeToConvert: null,
-          avgTouchpoints: null,
-          isRealData: false
-        });
-      }
-
-      // Add remaining single-page journeys for other converting pages
-      convertingPages.slice(1, 4).forEach((page, index) => {
-        if (page.conversions > 0) {
+      // Add real converting pages if they exist
+      convertingPages.forEach((page, index) => {
+        if (index < 2) { // Limit to top 2 to avoid clutter
           topPaths.push({
             steps: [
               { page: pathToJourneyName(page.page), url: page.page, sessions: page.sessions }
@@ -688,7 +727,7 @@ export async function GET(request) {
             conversions: page.conversions,
             users: Math.round(page.sessions * 0.85),
             sessions: page.sessions,
-            percentage: Math.round((page.conversions / totalConversions) * 100),
+            percentage: Math.round((page.conversions / Math.max(totalConversions, 1)) * 100),
             conversionRate: page.conversionRate,
             avgTimeToConvert: null,
             avgTouchpoints: null,
@@ -697,6 +736,7 @@ export async function GET(request) {
         }
       });
 
+      console.log('✅ Created', topPaths.length, 'logical journey paths');
       return { topPaths, isRealData: false };
     };
 
