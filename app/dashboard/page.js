@@ -18,8 +18,13 @@ export default function Dashboard() {
   const [showDateMenu, setShowDateMenu] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   
-  // Property selection state
-  const [currentProperty, setCurrentProperty] = useState('docket');
+  // Property selection state - persist across refreshes
+  const [currentProperty, setCurrentProperty] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('selectedProperty') || 'docket';
+    }
+    return 'docket';
+  });
   const [showPropertyMenu, setShowPropertyMenu] = useState(false);
   
   // Floating navigation state
@@ -188,6 +193,13 @@ export default function Dashboard() {
       setLoading(false);
     }
   }
+
+  // Save selected property to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('selectedProperty', currentProperty);
+    }
+  }, [currentProperty]);
 
   useEffect(() => {
     if (session) {
