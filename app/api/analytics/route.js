@@ -626,152 +626,187 @@ export async function GET(request) {
       return { topPaths, isRealData: true };
     };
 
-    // Create logical journey paths - SPECIFIC KNOWN FUNNELS with REAL GA4 data
+    // Create logical journey paths - ONLY REAL CONVERTING PAGES
     const createLogicalJourneyPaths = (pages, totalSessions, totalConversions) => {
-      console.log('🔍 Creating specific known funnels with REAL GA4 data...');
-      console.log('  - Total pages:', pages.length);
-      console.log('  - Total sessions:', totalSessions);
+      console.log('🔍 Building User Journey Intelligence from REAL GA4 data');
       console.log('  - Total conversions:', totalConversions);
-
-      // Find REAL pages from GA4 data for specific paths
+      
+      // THREE CONVERSION ENDPOINTS ONLY
+      const scheduleDemo = pages.find(p => p.page.includes('schedule-a-demo'));
+      const dumpsterSoftware = pages.find(p => p.page.includes('dumpster-rental-software'));
+      const junkSoftware = pages.find(p => p.page.includes('junk-removal-software'));
+      
+      // Common entry/journey pages
       const homePage = pages.find(p => p.page === '/' || p.page === '/home');
       const pricingPage = pages.find(p => p.page.includes('pricing'));
-      const scheduleADemoPage = pages.find(p => p.page.includes('schedule-a-demo'));
-      const dumpsterSoftwarePage = pages.find(p => p.page.includes('dumpster-rental-software'));
-      const junkSoftwarePage = pages.find(p => p.page.includes('junk-removal-software'));
-
-      console.log('  - Real HomePage found:', !!homePage, homePage?.page);
-      console.log('  - Real Pricing page found:', !!pricingPage, pricingPage?.page);
-      console.log('  - Real Schedule-a-Demo page found:', !!scheduleADemoPage, scheduleADemoPage?.page);
-      console.log('  - Real Dumpster Software page found:', !!dumpsterSoftwarePage, dumpsterSoftwarePage?.page);
-      console.log('  - Real Junk Software page found:', !!junkSoftwarePage, junkSoftwarePage?.page);
+      const blogPages = pages.filter(p => p.category === 'Blog' && p.sessions > 100).slice(0, 3);
       
-      // SHOW ALL PAGES to see what we're actually working with
-      console.log('📄 ALL GA4 PAGES AVAILABLE:');
-      pages.slice(0, 10).forEach((page, index) => {
-        console.log(`    ${index + 1}. ${page.page} (${page.sessions} sessions, ${page.conversions || 0} conversions)`);
-      });
-      if (pages.length > 10) {
-        console.log(`    ... and ${pages.length - 10} more pages`);
-      }
+      console.log('\n📊 CONVERSION ENDPOINTS FOUND:');
+      console.log('  - Schedule Demo:', scheduleDemo ? `${scheduleDemo.sessions} sessions, ${scheduleDemo.conversions} conversions` : 'NOT FOUND');
+      console.log('  - Dumpster Software:', dumpsterSoftware ? `${dumpsterSoftware.sessions} sessions, ${dumpsterSoftware.conversions} conversions` : 'NOT FOUND');
+      console.log('  - Junk Software:', junkSoftware ? `${junkSoftware.sessions} sessions, ${junkSoftware.conversions} conversions` : 'NOT FOUND');
+      
+      console.log('\n📄 JOURNEY PAGES FOUND:');
+      console.log('  - Homepage:', homePage ? `${homePage.sessions} sessions` : 'NOT FOUND');
+      console.log('  - Pricing:', pricingPage ? `${pricingPage.sessions} sessions` : 'NOT FOUND');
+      console.log('  - Top Blog Posts:', blogPages.length);
 
       const topPaths = [];
+      
+      // Calculate total conversions from our three endpoints
+      const actualTotalConversions = 
+        (scheduleDemo?.conversions || 0) + 
+        (dumpsterSoftware?.conversions || 0) + 
+        (junkSoftware?.conversions || 0);
+      
+      console.log('\n✅ Total conversions from endpoints:', actualTotalConversions);
 
-      // KNOWN FUNNEL 1: Home → Pricing → Schedule-a-demo (if pages exist)
-      if (homePage && pricingPage && scheduleADemoPage) {
-        const pathConversions = scheduleADemoPage.conversions || 0;
-        const pathSessions = Math.round((homePage.sessions + pricingPage.sessions + scheduleADemoPage.sessions) / 3);
+      // PATH 1: Home → Pricing → Schedule Demo
+      if (homePage && pricingPage && scheduleDemo && scheduleDemo.conversions > 0) {
+        // Estimate what portion of demo conversions came through this path
+        const estimatedPathConversions = Math.round(scheduleDemo.conversions * 0.4); // 40% via full journey
+        if (estimatedPathConversions > 0) {
+          topPaths.push({
+            steps: [
+              { page: 'Home', url: homePage.page, sessions: homePage.sessions },
+              { page: 'Pricing', url: pricingPage.page, sessions: pricingPage.sessions },
+              { page: 'Schedule Demo', url: scheduleDemo.page, sessions: scheduleDemo.sessions }
+            ],
+            conversions: estimatedPathConversions,
+            users: Math.round(estimatedPathConversions * 50), // Estimate 50:1 visitor to conversion
+            sessions: Math.round(estimatedPathConversions * 60), // Estimate 60:1 session to conversion
+            percentage: Math.round((estimatedPathConversions / actualTotalConversions) * 100),
+            conversionRate: (estimatedPathConversions / (estimatedPathConversions * 60)) * 100,
+            avgTimeToConvert: null,
+            avgTouchpoints: null,
+            isRealData: false
+          });
+        }
+      }
+
+      // PATH 2: Pricing → Schedule Demo
+      if (pricingPage && scheduleDemo && scheduleDemo.conversions > 0) {
+        const estimatedPathConversions = Math.round(scheduleDemo.conversions * 0.3); // 30% from pricing
+        if (estimatedPathConversions > 0) {
+          topPaths.push({
+            steps: [
+              { page: 'Pricing', url: pricingPage.page, sessions: pricingPage.sessions },
+              { page: 'Schedule Demo', url: scheduleDemo.page, sessions: scheduleDemo.sessions }
+            ],
+            conversions: estimatedPathConversions,
+            users: Math.round(estimatedPathConversions * 40),
+            sessions: Math.round(estimatedPathConversions * 45),
+            percentage: Math.round((estimatedPathConversions / actualTotalConversions) * 100),
+            conversionRate: (estimatedPathConversions / (estimatedPathConversions * 45)) * 100,
+            avgTimeToConvert: null,
+            avgTouchpoints: null,
+            isRealData: false
+          });
+        }
+      }
+
+      // PATH 3: Home → Schedule Demo (direct)
+      if (homePage && scheduleDemo && scheduleDemo.conversions > 0) {
+        const estimatedPathConversions = Math.round(scheduleDemo.conversions * 0.2); // 20% direct
+        if (estimatedPathConversions > 0) {
+          topPaths.push({
+            steps: [
+              { page: 'Home', url: homePage.page, sessions: homePage.sessions },
+              { page: 'Schedule Demo', url: scheduleDemo.page, sessions: scheduleDemo.sessions }
+            ],
+            conversions: estimatedPathConversions,
+            users: Math.round(estimatedPathConversions * 35),
+            sessions: Math.round(estimatedPathConversions * 40),
+            percentage: Math.round((estimatedPathConversions / actualTotalConversions) * 100),
+            conversionRate: (estimatedPathConversions / (estimatedPathConversions * 40)) * 100,
+            avgTimeToConvert: null,
+            avgTouchpoints: null,
+            isRealData: false
+          });
+        }
+      }
+
+      // PATH 4: Direct to Schedule Demo
+      if (scheduleDemo && scheduleDemo.conversions > 0) {
+        const estimatedPathConversions = Math.round(scheduleDemo.conversions * 0.1); // 10% direct landing
+        if (estimatedPathConversions > 0) {
+          topPaths.push({
+            steps: [
+              { page: 'Schedule Demo', url: scheduleDemo.page, sessions: scheduleDemo.sessions }
+            ],
+            conversions: estimatedPathConversions,
+            users: Math.round(estimatedPathConversions * 20),
+            sessions: Math.round(estimatedPathConversions * 25),
+            percentage: Math.round((estimatedPathConversions / actualTotalConversions) * 100),
+            conversionRate: (estimatedPathConversions / (estimatedPathConversions * 25)) * 100,
+            avgTimeToConvert: null,
+            avgTouchpoints: null,
+            isRealData: false
+          });
+        }
+      }
+
+      // PATH 5: Dumpster Software Page (converts on page)
+      if (dumpsterSoftware && dumpsterSoftware.conversions > 0) {
         topPaths.push({
           steps: [
-            { page: 'Home', url: homePage.page, sessions: homePage.sessions },
-            { page: 'Pricing', url: pricingPage.page, sessions: pricingPage.sessions },
-            { page: 'Demo Request', url: scheduleADemoPage.page, sessions: scheduleADemoPage.sessions }
+            { page: 'Dumpster Rental Software', url: dumpsterSoftware.page, sessions: dumpsterSoftware.sessions }
           ],
-          conversions: pathConversions || Math.round(totalConversions * 0.35),
-          users: Math.round(pathSessions * 0.7),
-          sessions: pathSessions,
-          percentage: pathConversions > 0 ? Math.round((pathConversions / totalConversions) * 100) : 35,
-          conversionRate: scheduleADemoPage.conversionRate || 12.8,
+          conversions: dumpsterSoftware.conversions,
+          users: Math.round(dumpsterSoftware.sessions * 0.85),
+          sessions: dumpsterSoftware.sessions,
+          percentage: Math.round((dumpsterSoftware.conversions / actualTotalConversions) * 100),
+          conversionRate: dumpsterSoftware.conversionRate,
           avgTimeToConvert: null,
           avgTouchpoints: null,
           isRealData: false
         });
       }
 
-      // KNOWN FUNNEL 2: Pricing → Schedule-a-demo (if pages exist)
-      if (pricingPage && scheduleADemoPage) {
-        const pathConversions = scheduleADemoPage.conversions || 0;
-        const pathSessions = Math.round((pricingPage.sessions + scheduleADemoPage.sessions) / 2);
+      // PATH 6: Junk Software Page (converts on page)
+      if (junkSoftware && junkSoftware.conversions > 0) {
         topPaths.push({
           steps: [
-            { page: 'Pricing', url: pricingPage.page, sessions: pricingPage.sessions },
-            { page: 'Demo Request', url: scheduleADemoPage.page, sessions: scheduleADemoPage.sessions }
+            { page: 'Junk Removal Software', url: junkSoftware.page, sessions: junkSoftware.sessions }
           ],
-          conversions: pathConversions || Math.round(totalConversions * 0.25),
-          users: Math.round(pathSessions * 0.8),
-          sessions: pathSessions,
-          percentage: pathConversions > 0 ? Math.round((pathConversions / totalConversions) * 100) : 25,
-          conversionRate: scheduleADemoPage.conversionRate || 8.5,
+          conversions: junkSoftware.conversions,
+          users: Math.round(junkSoftware.sessions * 0.85),
+          sessions: junkSoftware.sessions,
+          percentage: Math.round((junkSoftware.conversions / actualTotalConversions) * 100),
+          conversionRate: junkSoftware.conversionRate,
           avgTimeToConvert: null,
           avgTouchpoints: null,
           isRealData: false
         });
       }
 
-      // KNOWN FUNNEL 3: Home → Schedule-a-demo (if pages exist)
-      if (homePage && scheduleADemoPage) {
-        const pathConversions = scheduleADemoPage.conversions || 0;
-        const pathSessions = Math.round((homePage.sessions + scheduleADemoPage.sessions) / 2);
-        topPaths.push({
-          steps: [
-            { page: 'Home', url: homePage.page, sessions: homePage.sessions },
-            { page: 'Demo Request', url: scheduleADemoPage.page, sessions: scheduleADemoPage.sessions }
-          ],
-          conversions: pathConversions || Math.round(totalConversions * 0.20),
-          users: Math.round(pathSessions * 0.8),
-          sessions: pathSessions,
-          percentage: pathConversions > 0 ? Math.round((pathConversions / totalConversions) * 100) : 20,
-          conversionRate: scheduleADemoPage.conversionRate || 15.2,
-          avgTimeToConvert: null,
-          avgTouchpoints: null,
-          isRealData: false
-        });
+      // PATH 7: Blog → Schedule Demo (if high-traffic blog posts exist)
+      if (blogPages.length > 0 && scheduleDemo && scheduleDemo.conversions > 0) {
+        const topBlog = blogPages[0];
+        const estimatedPathConversions = Math.round(scheduleDemo.conversions * 0.05); // 5% from blog
+        if (estimatedPathConversions > 0) {
+          topPaths.push({
+            steps: [
+              { page: pathToJourneyName(topBlog.page), url: topBlog.page, sessions: topBlog.sessions },
+              { page: 'Schedule Demo', url: scheduleDemo.page, sessions: scheduleDemo.sessions }
+            ],
+            conversions: estimatedPathConversions,
+            users: Math.round(estimatedPathConversions * 100), // Blog has lower conversion rate
+            sessions: Math.round(estimatedPathConversions * 120),
+            percentage: Math.round((estimatedPathConversions / actualTotalConversions) * 100),
+            conversionRate: (estimatedPathConversions / (estimatedPathConversions * 120)) * 100,
+            avgTimeToConvert: null,
+            avgTouchpoints: null,
+            isRealData: false
+          });
+        }
       }
 
-      // STANDALONE PAGES - only if they have conversions
-      if (dumpsterSoftwarePage && dumpsterSoftwarePage.conversions > 0) {
-        topPaths.push({
-          steps: [{ page: 'Dumpster Rental Software', url: dumpsterSoftwarePage.page, sessions: dumpsterSoftwarePage.sessions }],
-          conversions: dumpsterSoftwarePage.conversions,
-          users: Math.round(dumpsterSoftwarePage.sessions * 0.85),
-          sessions: dumpsterSoftwarePage.sessions,
-          percentage: Math.round((dumpsterSoftwarePage.conversions / totalConversions) * 100),
-          conversionRate: dumpsterSoftwarePage.conversionRate,
-          avgTimeToConvert: null,
-          avgTouchpoints: null,
-          isRealData: false
-        });
-      }
-
-      if (junkSoftwarePage && junkSoftwarePage.conversions > 0) {
-        topPaths.push({
-          steps: [{ page: 'Junk Removal Software', url: junkSoftwarePage.page, sessions: junkSoftwarePage.sessions }],
-          conversions: junkSoftwarePage.conversions,
-          users: Math.round(junkSoftwarePage.sessions * 0.85),
-          sessions: junkSoftwarePage.sessions,
-          percentage: Math.round((junkSoftwarePage.conversions / totalConversions) * 100),
-          conversionRate: junkSoftwarePage.conversionRate,
-          avgTimeToConvert: null,
-          avgTouchpoints: null,
-          isRealData: false
-        });
-      }
-
-      // Add any other pages with real conversions
-      const otherConvertingPages = pages.filter(p => 
-        p.conversions > 0 && 
-        !p.page.includes('schedule-a-demo') &&
-        !p.page.includes('dumpster-rental-software') &&
-        !p.page.includes('junk-removal-software') &&
-        p.page !== '/' &&
-        !p.page.includes('pricing')
-      ).slice(0, 2);
-
-      otherConvertingPages.forEach(page => {
-        topPaths.push({
-          steps: [{ page: pathToJourneyName(page.page), url: page.page, sessions: page.sessions }],
-          conversions: page.conversions,
-          users: Math.round(page.sessions * 0.85),
-          sessions: page.sessions,
-          percentage: Math.round((page.conversions / totalConversions) * 100),
-          conversionRate: page.conversionRate,
-          avgTimeToConvert: null,
-          avgTouchpoints: null,
-          isRealData: false
-        });
+      console.log('\n📈 Created', topPaths.length, 'conversion paths');
+      topPaths.forEach((path, i) => {
+        console.log(`  ${i+1}. ${path.steps.map(s => s.page).join(' → ')}: ${path.conversions} conversions (${path.percentage}%)`);
       });
 
-      console.log('✅ Created', topPaths.length, 'specific journey paths using REAL GA4 data');
       return { topPaths, isRealData: false };
     };
 
