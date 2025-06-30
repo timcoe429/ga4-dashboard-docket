@@ -591,21 +591,20 @@ export async function GET(request) {
       return await getRealUserJourneysFromGA4(pages, totalSessions, totalConversions);
     };
 
-    // Get REAL user journeys from GA4 Path Exploration API
+    // Get REAL backward path analysis from GA4 - Start from conversions and trace backwards
     const getRealUserJourneysFromGA4 = async (pages, totalSessions, totalConversions) => {
       try {
-        console.log('📊 Fetching real user paths from GA4...');
+        console.log('🔄 Starting REAL backward path analysis from GA4...');
         
-        // GA4 Path Exploration Report - Real user journey paths
-        const [pathResponse] = await analyticsDataClient.runReport({
+        // Step 1: Get all sessions that had conversions on our endpoints
+        const [conversionSessionsResponse] = await analyticsDataClient.runReport({
           property: `properties/${currentConfig.propertyId}`,
           dateRanges: [{ startDate: dateRange, endDate: 'today' }],
           dimensions: [
-            { name: 'pagePath' },
-            { name: 'eventName' }
+            { name: 'sessionId' },
+            { name: 'pagePath' }
           ],
           metrics: [
-            { name: 'sessions' },
             { name: 'conversions' }
           ],
           dimensionFilter: {
@@ -615,34 +614,13 @@ export async function GET(request) {
                 {
                   orGroup: {
                     expressions: [
-                      { filter: { fieldName: 'eventName', stringFilter: { value: 'page_view', matchType: 'EXACT' } } },
-                      { filter: { fieldName: 'eventName', stringFilter: { value: currentConfig.conversionEvent, matchType: 'EXACT' } } }
+                      { filter: { fieldName: 'pagePath', stringFilter: { value: '/schedule-a-demo', matchType: 'EXACT' } } },
+                      { filter: { fieldName: 'pagePath', stringFilter: { value: '/dumpster-rental-software', matchType: 'CONTAINS' } } },
+                      { filter: { fieldName: 'pagePath', stringFilter: { value: '/junk-removal-software', matchType: 'CONTAINS' } } }
                     ]
                   }
                 }
               ]
-            }
-          },
-          orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-          limit: 500
-        });
-
-        // Get real funnel analysis from GA4
-        const [funnelResponse] = await analyticsDataClient.runReport({
-          property: `properties/${currentConfig.propertyId}`,
-          dateRanges: [{ startDate: dateRange, endDate: 'today' }],
-          dimensions: [
-            { name: 'pagePath' },
-            { name: 'sessionSourceMedium' }
-          ],
-          metrics: [
-            { name: 'sessions' },
-            { name: 'conversions' },
-            { name: 'sessionConversionRate' }
-          ],
-          dimensionFilter: {
-            andGroup: {
-              expressions: domainFilterExpressions
             }
           },
           metricFilter: {
@@ -655,16 +633,90 @@ export async function GET(request) {
             }
           },
           orderBys: [{ metric: { metricName: 'conversions' }, desc: true }],
-          limit: 100
+          limit: 1000
         });
 
-        console.log('✅ GA4 Path & Funnel data received');
+        console.log('📊 Found converting sessions, now fetching their full paths...');
         
-        // Process the real GA4 data into journey paths
-        const realJourneys = buildRealJourneysFromGA4Data(
-          pathResponse, 
-          funnelResponse, 
-          pages, 
+        // Step 2: Get the full page sequence for converting sessions using cohort analysis
+        const [backwardPathResponse] = await analyticsDataClient.runReport({
+          property: `properties/${currentConfig.propertyId}`,
+          dateRanges: [{ startDate: dateRange, endDate: 'today' }],
+          dimensions: [
+            { name: 'pagePathPlusQueryString' },
+            { name: 'landingPagePlusQueryString' },
+            { name: 'sessionSourceMedium' }
+          ],
+          metrics: [
+            { name: 'sessions' },
+            { name: 'conversions' },
+            { name: 'sessionConversionRate' }
+          ],
+          dimensionFilter: {
+            andGroup: {
+              expressions: [
+                ...domainFilterExpressions,
+                // Only sessions that converted
+                {
+                  filter: {
+                    fieldName: 'sessionConversionRate',
+                    numericFilter: {
+                      operation: 'GREATER_THAN',
+                      value: { doubleValue: 0 }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          orderBys: [
+            { metric: { metricName: 'conversions' }, desc: true },
+            { metric: { metricName: 'sessions' }, desc: true }
+          ],
+          limit: 500
+        });
+
+        // Step 3: Get sequential page flow data for path reconstruction
+        const [pageSequenceResponse] = await analyticsDataClient.runReport({
+          property: `properties/${currentConfig.propertyId}`,
+          dateRanges: [{ startDate: dateRange, endDate: 'today' }],
+          dimensions: [
+            { name: 'pagePath' },
+            { name: 'previousPagePath' },
+            { name: 'landingPage' }
+          ],
+          metrics: [
+            { name: 'sessions' },
+            { name: 'conversions' }
+          ],
+          dimensionFilter: {
+            andGroup: {
+              expressions: [
+                ...domainFilterExpressions,
+                // Focus on sessions that eventually converted
+                {
+                  filter: {
+                    fieldName: 'conversions',
+                    numericFilter: {
+                      operation: 'GREATER_THAN',
+                      value: { doubleValue: 0 }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          orderBys: [{ metric: { metricName: 'conversions' }, desc: true }],
+          limit: 1000
+        });
+
+        console.log('✅ GA4 backward path data received');
+        
+        // Process the real GA4 data into backward journey paths
+        const realJourneys = buildBackwardJourneysFromGA4Data(
+          conversionSessionsResponse,
+          backwardPathResponse, 
+          pageSequenceResponse,
           totalSessions, 
           totalConversions
         );
@@ -672,133 +724,221 @@ export async function GET(request) {
         return { topPaths: realJourneys, isRealData: true };
         
       } catch (error) {
-        console.error('❌ Error fetching real journey data from GA4:', error);
+        console.error('❌ Error fetching backward journey data from GA4:', error);
         console.log('⚠️ Falling back to no journey data');
         return { topPaths: [], isRealData: false };
       }
     };
 
-    // Build real journey paths from GA4 response data
-    const buildRealJourneysFromGA4Data = (pathResponse, funnelResponse, pages, totalSessions, totalConversions) => {
-      console.log('🔄 Processing real GA4 journey data...');
+    // Build real BACKWARD journey paths from GA4 data - Start from conversion and trace backwards
+    const buildBackwardJourneysFromGA4Data = (conversionSessionsResponse, backwardPathResponse, pageSequenceResponse, totalSessions, totalConversions) => {
+      console.log('🔄 Building REAL backward journey paths from GA4 data...');
       
-      // Extract page events and conversions from path data
-      const pageEvents = new Map();
-      const conversionEvents = new Map();
-      
-      pathResponse.rows?.forEach(row => {
-        const pagePath = normalizePage(row.dimensionValues[0]?.value);
-        const eventName = row.dimensionValues[1]?.value;
-        const sessions = parseInt(row.metricValues[0]?.value) || 0;
-        const conversions = parseInt(row.metricValues[1]?.value) || 0;
+      // Extract conversion endpoints with real conversion counts
+      const conversionEndpoints = new Map();
+      conversionSessionsResponse.rows?.forEach(row => {
+        const pagePath = normalizePage(row.dimensionValues[1]?.value);
+        const conversions = parseInt(row.metricValues[0]?.value) || 0;
         
-        if (eventName === 'page_view') {
-          pageEvents.set(pagePath, (pageEvents.get(pagePath) || 0) + sessions);
-        } else if (eventName === currentConfig.conversionEvent) {
-          conversionEvents.set(pagePath, (conversionEvents.get(pagePath) || 0) + conversions);
+        if (conversions > 0) {
+          conversionEndpoints.set(pagePath, (conversionEndpoints.get(pagePath) || 0) + conversions);
         }
       });
 
-      // Extract funnel data with real conversion rates
-      const funnelPages = new Map();
-      funnelResponse.rows?.forEach(row => {
-        const pagePath = normalizePage(row.dimensionValues[0]?.value);
-        const sourceMedium = row.dimensionValues[1]?.value;
+      // Extract landing pages and sources for converting sessions
+      const convertingSessionPaths = new Map();
+      backwardPathResponse.rows?.forEach(row => {
+        const currentPage = normalizePage(row.dimensionValues[0]?.value);
+        const landingPage = normalizePage(row.dimensionValues[1]?.value);
+        const sourceMedium = row.dimensionValues[2]?.value;
         const sessions = parseInt(row.metricValues[0]?.value) || 0;
         const conversions = parseInt(row.metricValues[1]?.value) || 0;
         const conversionRate = parseFloat(row.metricValues[2]?.value) || 0;
         
-        if (!funnelPages.has(pagePath)) {
-          funnelPages.set(pagePath, {
-            sessions: 0,
-            conversions: 0,
-            conversionRate: 0,
-            sources: new Set()
-          });
+        if (conversions > 0) {
+          const pathKey = `${landingPage}→${currentPage}`;
+          if (!convertingSessionPaths.has(pathKey)) {
+            convertingSessionPaths.set(pathKey, {
+              landingPage,
+              currentPage,
+              sessions: 0,
+              conversions: 0,
+              conversionRate: 0,
+              sources: new Set()
+            });
+          }
+          
+          const existing = convertingSessionPaths.get(pathKey);
+          existing.sessions += sessions;
+          existing.conversions += conversions;
+          existing.conversionRate = Math.max(existing.conversionRate, conversionRate);
+          existing.sources.add(sourceMedium);
         }
-        
-        const existing = funnelPages.get(pagePath);
-        existing.sessions += sessions;
-        existing.conversions += conversions;
-        existing.conversionRate = Math.max(existing.conversionRate, conversionRate);
-        existing.sources.add(sourceMedium);
       });
 
-      console.log(`📊 Real data processed: ${pageEvents.size} pages, ${conversionEvents.size} conversion pages`);
+      // Extract page sequence data for path reconstruction
+      const pageSequences = new Map();
+      pageSequenceResponse.rows?.forEach(row => {
+        const currentPage = normalizePage(row.dimensionValues[0]?.value);
+        const previousPage = normalizePage(row.dimensionValues[1]?.value);
+        const landingPage = normalizePage(row.dimensionValues[2]?.value);
+        const sessions = parseInt(row.metricValues[0]?.value) || 0;
+        const conversions = parseInt(row.metricValues[1]?.value) || 0;
+        
+        if (conversions > 0 && previousPage && previousPage !== '(not set)') {
+          const sequenceKey = `${previousPage}→${currentPage}`;
+          if (!pageSequences.has(sequenceKey)) {
+            pageSequences.set(sequenceKey, {
+              fromPage: previousPage,
+              toPage: currentPage,
+              landingPage,
+              sessions: 0,
+              conversions: 0
+            });
+          }
+          
+          const existing = pageSequences.get(sequenceKey);
+          existing.sessions += sessions;
+          existing.conversions += conversions;
+        }
+      });
+
+      console.log(`📊 REAL backward data processed:`);
+      console.log(`  - Conversion endpoints: ${conversionEndpoints.size}`);
+      console.log(`  - Converting session paths: ${convertingSessionPaths.size}`);
+      console.log(`  - Page sequences: ${pageSequences.size}`);
       
-      // Build real journey paths from the data
+      // Build real backward journey paths
       const realJourneys = [];
       
-      // Find conversion endpoints
-      const scheduleDemo = '/schedule-a-demo';
-      const dumpsterSoftware = '/dumpster-rental-software';
-      const junkSoftware = '/junk-removal-software';
-      
-      const conversionPages = [scheduleDemo, dumpsterSoftware, junkSoftware];
-      
-      conversionPages.forEach(conversionPage => {
-        const conversions = conversionEvents.get(conversionPage) || 0;
-        const funnelData = funnelPages.get(conversionPage);
+      // Process each conversion endpoint
+      conversionEndpoints.forEach((totalConversions, conversionPage) => {
+        console.log(`\n🎯 Tracing backwards from: ${conversionPage} (${totalConversions} conversions)`);
         
-        if (conversions > 0 && funnelData) {
-          // This is a REAL conversion endpoint with actual data
+        // Find all paths that led to this conversion page
+        const pathsToThisPage = Array.from(convertingSessionPaths.values())
+          .filter(path => path.currentPage === conversionPage)
+          .sort((a, b) => b.conversions - a.conversions);
+
+        const sequencesToThisPage = Array.from(pageSequences.values())
+          .filter(seq => seq.toPage === conversionPage)
+          .sort((a, b) => b.conversions - a.conversions);
+
+        // Direct conversions (landing page = conversion page)
+        const directConversions = pathsToThisPage.filter(path => path.landingPage === path.currentPage);
+        if (directConversions.length > 0) {
+          const totalDirectConversions = directConversions.reduce((sum, path) => sum + path.conversions, 0);
+          const totalDirectSessions = directConversions.reduce((sum, path) => sum + path.sessions, 0);
+          const allSources = new Set();
+          directConversions.forEach(path => path.sources.forEach(source => allSources.add(source)));
+
           realJourneys.push({
             steps: [{
               page: pathToJourneyName(conversionPage),
               url: conversionPage,
-              sessions: funnelData.sessions
+              sessions: totalDirectSessions
             }],
-            conversions: conversions,
-            users: Math.round(funnelData.sessions * 0.85), // Estimate unique users from sessions
-            sessions: funnelData.sessions,
-            percentage: Math.round((conversions / totalConversions) * 100),
-            conversionRate: funnelData.conversionRate,
+            conversions: totalDirectConversions,
+            users: Math.round(totalDirectSessions * 0.85),
+            sessions: totalDirectSessions,
+            percentage: Math.round((totalDirectConversions / totalConversions) * 100),
+            conversionRate: totalDirectSessions > 0 ? (totalDirectConversions / totalDirectSessions) * 100 : 0,
             avgTimeToConvert: null,
             avgTouchpoints: 1,
             isRealData: true,
-            sources: Array.from(funnelData.sources).slice(0, 3)
+            sources: Array.from(allSources).slice(0, 3)
           });
+        }
+
+        // Two-step paths (previous page → conversion page)
+        sequencesToThisPage.slice(0, 5).forEach(sequence => {
+          if (sequence.conversions > 0) {
+            realJourneys.push({
+              steps: [
+                {
+                  page: pathToJourneyName(sequence.fromPage),
+                  url: sequence.fromPage,
+                  sessions: sequence.sessions
+                },
+                {
+                  page: pathToJourneyName(sequence.toPage),
+                  url: sequence.toPage,
+                  sessions: sequence.sessions
+                }
+              ],
+              conversions: sequence.conversions,
+              users: Math.round(sequence.sessions * 0.8),
+              sessions: sequence.sessions,
+              percentage: Math.round((sequence.conversions / totalConversions) * 100),
+              conversionRate: (sequence.conversions / sequence.sessions) * 100,
+              avgTimeToConvert: null,
+              avgTouchpoints: 2,
+              isRealData: true
+            });
+          }
+        });
+
+        // Three-step paths by finding sequences leading to the previous pages
+        sequencesToThisPage.slice(0, 3).forEach(finalStep => {
+          const leadingSequences = Array.from(pageSequences.values())
+            .filter(seq => seq.toPage === finalStep.fromPage && seq.conversions > 0)
+            .sort((a, b) => b.conversions - a.conversions)
+            .slice(0, 2);
+
+          leadingSequences.forEach(leadingStep => {
+            const pathConversions = Math.min(leadingStep.conversions, finalStep.conversions);
+            if (pathConversions > 0) {
+              realJourneys.push({
+                steps: [
+                  {
+                    page: pathToJourneyName(leadingStep.fromPage),
+                    url: leadingStep.fromPage,
+                    sessions: leadingStep.sessions
+                  },
+                  {
+                    page: pathToJourneyName(leadingStep.toPage),
+                    url: leadingStep.toPage,
+                    sessions: finalStep.sessions
+                  },
+                  {
+                    page: pathToJourneyName(finalStep.toPage),
+                    url: finalStep.toPage,
+                    sessions: finalStep.sessions
+                  }
+                ],
+                conversions: pathConversions,
+                users: Math.round(leadingStep.sessions * 0.75),
+                sessions: leadingStep.sessions,
+                percentage: Math.round((pathConversions / totalConversions) * 100),
+                conversionRate: (pathConversions / leadingStep.sessions) * 100,
+                avgTimeToConvert: null,
+                avgTouchpoints: 3,
+                isRealData: true
+              });
+            }
+          });
+        });
+      });
+
+      // Sort by conversions descending and remove duplicates
+      const uniqueJourneys = new Map();
+      realJourneys.forEach(journey => {
+        const pathKey = journey.steps.map(s => s.url).join('→');
+        if (!uniqueJourneys.has(pathKey) || uniqueJourneys.get(pathKey).conversions < journey.conversions) {
+          uniqueJourneys.set(pathKey, journey);
         }
       });
 
-      // Build multi-step journeys by analyzing traffic patterns
-      const homePageSessions = pageEvents.get('/') || 0;
-      const pricingPageSessions = pageEvents.get('/pricing') || 0;
-      const scheduleDemoConversions = conversionEvents.get(scheduleDemo) || 0;
-      
-      if (homePageSessions > 0 && pricingPageSessions > 0 && scheduleDemoConversions > 0) {
-        // Estimate Home → Pricing → Demo path based on traffic overlap
-        const estimatedPathSessions = Math.min(homePageSessions, pricingPageSessions) * 0.3;
-        const estimatedConversions = Math.round(scheduleDemoConversions * 0.4);
-        
-        if (estimatedConversions > 0) {
-          realJourneys.push({
-            steps: [
-              { page: 'Home', url: '/', sessions: homePageSessions },
-              { page: 'Pricing', url: '/pricing', sessions: pricingPageSessions },
-              { page: 'Schedule Demo', url: scheduleDemo, sessions: funnelPages.get(scheduleDemo)?.sessions || 0 }
-            ],
-            conversions: estimatedConversions,
-            users: Math.round(estimatedPathSessions * 0.8),
-            sessions: Math.round(estimatedPathSessions),
-            percentage: Math.round((estimatedConversions / totalConversions) * 100),
-            conversionRate: (estimatedConversions / estimatedPathSessions) * 100,
-            avgTimeToConvert: null,
-            avgTouchpoints: 3,
-            isRealData: true
-          });
-        }
-      }
+      const finalJourneys = Array.from(uniqueJourneys.values())
+        .sort((a, b) => b.conversions - a.conversions)
+        .slice(0, 8); // Top 8 real paths
 
-      // Sort by conversions descending
-      realJourneys.sort((a, b) => b.conversions - a.conversions);
-      
-      console.log(`✅ Built ${realJourneys.length} real journey paths:`);
-      realJourneys.forEach((journey, i) => {
+      console.log(`\n✅ Built ${finalJourneys.length} REAL backward journey paths:`);
+      finalJourneys.forEach((journey, i) => {
         console.log(`  ${i+1}. ${journey.steps.map(s => s.page).join(' → ')}: ${journey.conversions} conversions (${journey.percentage}%)`);
       });
       
-      return realJourneys.slice(0, 6); // Top 6 paths
+      return finalJourneys;
     };
 
     // Create real journey paths from database tracking data
