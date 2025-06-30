@@ -585,23 +585,17 @@ export async function GET(request) {
       }
     };
 
-    // User Journey Analysis - Hybrid: Real tracked journeys + Known funnels
+    // User Journey Analysis - FORCE LOGICAL PATHS (bypass database)
     const calculateUserJourneys = async (pages) => {
-      // Get real time-to-convert data from database
-      const timeMetrics = await calculateTimeToConvertMetrics(property);
-      
-      console.log('🔍 Journey Analysis:');
-      console.log('  - Real tracked journeys found:', timeMetrics.conversionJourneys.length);
-      
-      // If we have real tracked journey data, use it
-      if (timeMetrics.conversionJourneys.length > 0) {
-        console.log('  - Using REAL tracked journey data from database');
-        return createRealJourneyPaths(timeMetrics, pages, totalSessions, totalConversions);
-      }
-      
-      // Otherwise, show known funnels with real GA4 data
-      console.log('  - Using known funnels with real GA4 data');
+      // BYPASSING DATABASE - Always use logical paths
+      console.log('🔍 Journey Analysis: Using logical conversion paths');
       return createLogicalJourneyPaths(pages, totalSessions, totalConversions);
+      
+      // COMMENTED OUT - Database check that was showing Login paths
+      // const timeMetrics = await calculateTimeToConvertMetrics(property);
+      // if (timeMetrics.conversionJourneys.length > 0) {
+      //   return createRealJourneyPaths(timeMetrics, pages, totalSessions, totalConversions);
+      // }
     };
 
     // Create real journey paths from database tracking data
