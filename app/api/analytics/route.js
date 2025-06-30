@@ -64,11 +64,51 @@ export async function GET(request) {
       return normalized;
     }
 
+    // 🎯 FETCH BLOG POSTS FROM SITEMAP (100% accurate!)
+    const fetchBlogPostsFromSitemap = async (propertyType) => {
+      try {
+        if (propertyType === 'docket') {
+          const sitemapUrl = 'https://www.yourdocket.com/post-sitemap.xml';
+          const response = await fetch(sitemapUrl);
+          const xmlText = await response.text();
+          
+          // Extract URLs from sitemap XML
+          const urlMatches = xmlText.match(/<loc>(.*?)<\/loc>/g);
+          if (!urlMatches) return new Set();
+          
+          const blogPaths = new Set();
+          urlMatches.forEach(match => {
+            const url = match.replace(/<\/?loc>/g, '');
+            const path = url.replace('https://www.yourdocket.com', '').replace('https://yourdocket.com', '');
+            if (path && path !== '/') {
+              blogPaths.add(path.endsWith('/') ? path : path + '/');
+              blogPaths.add(path.endsWith('/') ? path.slice(0, -1) : path);
+            }
+          });
+          
+          console.log('📄 SITEMAP BLOG DETECTION:');
+          console.log('  - Blog paths found:', blogPaths.size);
+          console.log('  - Sample paths:', Array.from(blogPaths).slice(0, 3));
+          
+          return blogPaths;
+        }
+        return new Set();
+      } catch (error) {
+        console.error('❌ Failed to fetch sitemap:', error);
+        return new Set();
+      }
+    };
+
     // Helper function to categorize pages (property-specific)
-    function categorizePage(pagePath, propertyType) {
+    function categorizePage(pagePath, propertyType, blogPaths = new Set()) {
       if (pagePath === '/') return 'Homepage';
       if (pagePath.includes('/blog')) return 'Blog';
       if (pagePath.includes('/pricing') || pagePath.includes('/plans')) return 'Pricing';
+      
+      // 🎯 SITEMAP-BASED BLOG DETECTION (100% accurate!)
+      if (propertyType === 'docket' && blogPaths.has(pagePath)) {
+        return 'Blog';
+      }
       
       if (propertyType === 'docket') {
         if (pagePath.includes('software') || pagePath.includes('dumpster') || pagePath.includes('junk')) return 'Product';
@@ -152,6 +192,10 @@ export async function GET(request) {
     }
     console.log('  - Filter expressions count:', domainFilterExpressions.length);
 
+    // 🎯 FETCH BLOG POSTS FROM SITEMAP BEFORE PROCESSING
+    console.log('📄 Fetching blog posts from sitemap...');
+    const blogPaths = await fetchBlogPostsFromSitemap(property);
+
     // Get current period data
     console.log('📊 Making GA4 API call for pages data...');
     console.log('  - Property:', `properties/${currentConfig.propertyId}`);
@@ -171,7 +215,7 @@ export async function GET(request) {
           expressions: domainFilterExpressions
         }
       },
-      limit: 100,
+      limit: 200, // Increased to capture more blog posts
       orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }]
     });
 
@@ -241,7 +285,7 @@ export async function GET(request) {
         currentPageGroups[normalizedPath] = {
           page: normalizedPath,
           title: extractTitle(normalizedPath, pageTitle),
-          category: categorizePage(normalizedPath, property),
+          category: categorizePage(normalizedPath, property, blogPaths),
           sessions: 0,
           users: 0,
           bounceRate: 0,
@@ -310,7 +354,7 @@ export async function GET(request) {
             expressions: domainFilterExpressions
           }
         },
-        limit: 100,
+        limit: 200, // Increased to capture more blog posts in comparison
         orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }]
       });
 
@@ -428,6 +472,44 @@ export async function GET(request) {
     console.log('  - Total Conversions:', totalConversions);
     console.log('  - Total Users:', totalUsers);
     console.log('  - Conversion Rate:', totalSessions > 0 ? ((totalConversions / totalSessions) * 100).toFixed(2) + '%' : '0%');
+    
+    // 🚨 DEBUG: Blog post analysis with sitemap verification
+    const allBlogPosts = currentPages.filter(p => p.category === 'Blog');
+    const allCategories = {};
+    currentPages.forEach(p => {
+      if (!allCategories[p.category]) allCategories[p.category] = [];
+      allCategories[p.category].push(p.page);
+    });
+    
+    console.log('📝 SITEMAP-BASED BLOG DETECTION RESULTS:');
+    console.log('  - Sitemap blog paths loaded:', blogPaths.size);
+    console.log('  - Blog posts found by categorization:', allBlogPosts.length);
+    console.log('  - Blog posts with sessions > 0:', allBlogPosts.filter(p => p.sessions > 0).length);
+    
+    if (allBlogPosts.length > 0) {
+      console.log('  - Detected blog paths:', allBlogPosts.slice(0, 5).map(p => p.page));
+      console.log('  - Blog sessions:', allBlogPosts.slice(0, 5).map(p => p.sessions));
+      console.log('  - Blog titles:', allBlogPosts.slice(0, 5).map(p => p.title));
+    } else {
+      console.log('  - ❌ NO BLOG POSTS DETECTED!');
+      if (blogPaths.size > 0) {
+        console.log('  - But sitemap HAS blog paths, checking if GA4 returned them...');
+        const sampleSitemapPaths = Array.from(blogPaths).slice(0, 3);
+        console.log('  - Sample sitemap paths:', sampleSitemapPaths);
+        sampleSitemapPaths.forEach(path => {
+          const foundInGA4 = currentPages.find(p => p.page === path);
+          console.log(`    ${path}: ${foundInGA4 ? 'FOUND in GA4' : 'NOT in GA4 data'}`);
+        });
+      }
+    }
+    
+    console.log('🏷️ ALL CATEGORIES DEBUG:');
+    Object.keys(allCategories).forEach(category => {
+      console.log(`  - ${category}: ${allCategories[category].length} pages`);
+      if (category === 'Other' && allCategories[category].length > 0) {
+        console.log(`    Sample "Other" pages:`, allCategories[category].slice(0, 3));
+      }
+    });
 
     // Category performance
     const categoryPerformance = {};
@@ -712,8 +794,16 @@ export async function GET(request) {
       highTrafficLowConversion: pagesWithTrends.filter(p => p.sessions > 100 && p.conversionRate < 1).slice(0, 5),
       categoryPerformance,
       
-      // Blog specific
-      blogPosts: pagesWithTrends.filter(p => p.category === 'Blog').slice(0, 6),
+      // Blog specific - TOP 10 as requested
+      blogPosts: (() => {
+        const blogPosts = pagesWithTrends.filter(p => p.category === 'Blog').slice(0, 10);
+        console.log('📤 FINAL BLOG POSTS BEING RETURNED:', blogPosts.length);
+        if (blogPosts.length > 0) {
+          console.log('  - Blog post titles:', blogPosts.map(p => p.title));
+          console.log('  - Blog post sessions:', blogPosts.map(p => p.sessions));
+        }
+        return blogPosts;
+      })(),
       
       // Advanced Analytics - ENHANCED USER JOURNEYS
       journeyData: fullJourneyData,
