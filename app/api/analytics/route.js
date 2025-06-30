@@ -88,6 +88,25 @@ export async function GET(request) {
       return lastPart.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).trim() || 'Untitled Page';
     }
 
+    // Helper function to convert path to clean journey slug
+    function pathToJourneyName(pagePath) {
+      if (pagePath === '/' || pagePath === '' || pagePath === '/home') return 'Home';
+      if (pagePath === '/pricing') return 'Pricing';
+      if (pagePath === '/contact') return 'Contact';
+      if (pagePath === '/about') return 'About';
+      if (pagePath === '/features') return 'Features';
+      if (pagePath.includes('/blog/')) {
+        const slug = pagePath.replace('/blog/', '').replace(/[^a-zA-Z0-9]/g, ' ').trim();
+        return slug.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || 'Blog Post';
+      }
+      if (pagePath.includes('/demo') || pagePath.includes('/schedule')) return 'Demo Request';
+      if (pagePath.includes('/signup') || pagePath.includes('/register')) return 'Sign Up';
+      
+      // Default: clean up the path
+      const cleanPath = pagePath.replace(/^\/+/, '').replace(/[^a-zA-Z0-9]/g, ' ').trim();
+      return cleanPath.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || 'Page';
+    }
+
     // Build domain filter expressions
     const domainFilterExpressions = [
       { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
@@ -199,9 +218,10 @@ export async function GET(request) {
       engagementScore: page.sessions > 0 ? parseFloat((((1 - page.bounceRate/100) * page.avgDuration/60) * 100).toFixed(1)) : 0
     })).sort((a, b) => b.conversionRate - a.conversionRate);
 
-    // Get comparison data if requested
+    // Always get comparison data for blog posts (even if overall compareMode is false)
     let comparisonData = null;
-    if (compareMode) {
+    const needsComparison = true; // Always calculate for blog comparison
+    if (needsComparison) {
       // Calculate proper comparison date range
       let compareStartDate, compareEndDate;
       const currentDays = parseInt(dateRange.replace('daysAgo', ''));
@@ -433,7 +453,7 @@ export async function GET(request) {
     const createRealJourneyPaths = (timeMetrics, pages, totalSessions, totalConversions) => {
       const topPaths = timeMetrics.conversionJourneys.map((journey, index) => ({
         steps: journey.journeyPath.map(step => ({
-          page: step.title || step.page,
+          page: pathToJourneyName(step.page),
           url: step.page,
           sessions: step.sessions || 0,
           timeOnPage: step.timeOnPage || null
@@ -465,9 +485,9 @@ export async function GET(request) {
       if (homePage && pricingPage && convertingPages[0]) {
         topPaths.push({
           steps: [
-            { page: homePage.title, url: homePage.page, sessions: homePage.sessions },
-            { page: pricingPage.title, url: pricingPage.page, sessions: pricingPage.sessions },
-            { page: convertingPages[0].title, url: convertingPages[0].page, sessions: convertingPages[0].sessions }
+            { page: pathToJourneyName(homePage.page), url: homePage.page, sessions: homePage.sessions },
+            { page: pathToJourneyName(pricingPage.page), url: pricingPage.page, sessions: pricingPage.sessions },
+            { page: pathToJourneyName(convertingPages[0].page), url: convertingPages[0].page, sessions: convertingPages[0].sessions }
           ],
           conversions: Math.round(totalConversions * 0.35),
           users: Math.round(totalSessions * 0.12),
@@ -484,9 +504,9 @@ export async function GET(request) {
       if (blogPosts[0] && productPages[0] && convertingPages[0]) {
         topPaths.push({
           steps: [
-            { page: blogPosts[0].title, url: blogPosts[0].page, sessions: blogPosts[0].sessions },
-            { page: productPages[0].title, url: productPages[0].page, sessions: productPages[0].sessions },
-            { page: convertingPages[0].title, url: convertingPages[0].page, sessions: convertingPages[0].sessions }
+            { page: pathToJourneyName(blogPosts[0].page), url: blogPosts[0].page, sessions: blogPosts[0].sessions },
+            { page: pathToJourneyName(productPages[0].page), url: productPages[0].page, sessions: productPages[0].sessions },
+            { page: pathToJourneyName(convertingPages[0].page), url: convertingPages[0].page, sessions: convertingPages[0].sessions }
           ],
           conversions: Math.round(totalConversions * 0.25),
           users: Math.round(totalSessions * 0.08),
@@ -503,7 +523,7 @@ export async function GET(request) {
       if (convertingPages[0]) {
         topPaths.push({
           steps: [
-            { page: convertingPages[0].title, url: convertingPages[0].page, sessions: convertingPages[0].sessions }
+            { page: pathToJourneyName(convertingPages[0].page), url: convertingPages[0].page, sessions: convertingPages[0].sessions }
           ],
           conversions: Math.round(totalConversions * 0.20),
           users: Math.round(totalSessions * 0.06),
@@ -521,7 +541,7 @@ export async function GET(request) {
         if (page.conversions > 0) {
           topPaths.push({
             steps: [
-              { page: page.title, url: page.page, sessions: page.sessions }
+              { page: pathToJourneyName(page.page), url: page.page, sessions: page.sessions }
             ],
             conversions: page.conversions,
             users: Math.round(page.sessions * 0.85),

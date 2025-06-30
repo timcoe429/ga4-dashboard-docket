@@ -1,7 +1,7 @@
 import { ArrowUpRight, ArrowDownRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 
-export default function BlogPosts({ data, showComparison = false }) {
+export default function BlogPosts({ data, showComparison = true }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Handle empty or invalid data
