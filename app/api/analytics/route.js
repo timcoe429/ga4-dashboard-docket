@@ -314,7 +314,7 @@ export async function GET(request) {
     // Calculate performance metrics
     const currentPages = Object.values(currentPageGroups).map(page => ({
       ...page,
-      conversionRate: page.sessions > 0 ? parseFloat(((page.conversions / page.sessions) * 100).toFixed(2)) : 0,
+                  conversionRate: page.sessions > 0 ? Math.round((page.conversions / page.sessions) * 100) : 0,
       conversionValue: page.conversions * 50, // Assume $50 per conversion for value calculation
       engagementScore: page.sessions > 0 ? parseFloat((((1 - page.bounceRate/100) * page.avgDuration/60) * 100).toFixed(1)) : 0
     })).sort((a, b) => b.conversionRate - a.conversionRate);
@@ -416,7 +416,7 @@ export async function GET(request) {
       // Calculate conversion rates for comparison data
       Object.keys(comparePageGroups).forEach(path => {
         const data = comparePageGroups[path];
-        data.conversionRate = data.sessions > 0 ? parseFloat(((data.conversions / data.sessions) * 100).toFixed(2)) : 0;
+        data.conversionRate = data.sessions > 0 ? Math.round((data.conversions / data.sessions) * 100) : 0;
       });
 
       comparisonData = comparePageGroups;
@@ -524,7 +524,7 @@ export async function GET(request) {
 
     Object.keys(categoryPerformance).forEach(category => {
       const data = categoryPerformance[category];
-      data.conversionRate = data.sessions > 0 ? parseFloat(((data.conversions / data.sessions) * 100).toFixed(2)) : 0;
+              data.conversionRate = data.sessions > 0 ? Math.round((data.conversions / data.sessions) * 100) : 0;
     });
 
     // Calculate real time-to-convert metrics from database
@@ -783,7 +783,7 @@ export async function GET(request) {
             users: Math.round(data.sessions * 0.85),
             sessions: data.sessions,
             percentage: Math.round((data.conversions / totalConversions) * 100),
-            conversionRate: (data.conversions / data.sessions) * 100,
+            conversionRate: Math.round((data.conversions / data.sessions) * 100),
             avgTimeToConvert: null,
             avgTouchpoints: 1,
             isRealData: true,
@@ -812,15 +812,15 @@ export async function GET(request) {
                 sessions: data.sessions
               }
             ],
-            conversions: data.conversions,
-            users: Math.round(data.sessions * 0.8),
-            sessions: data.sessions,
-            percentage: Math.round((data.conversions / totalConversions) * 100),
-            conversionRate: (data.conversions / data.sessions) * 100,
-            avgTimeToConvert: null,
-            avgTouchpoints: 2,
-            isRealData: true,
-            sources: Array.from(data.sources).slice(0, 3)
+                         conversions: data.conversions,
+             users: Math.round(data.sessions * 0.8),
+             sessions: data.sessions,
+             percentage: Math.round((data.conversions / totalConversions) * 100),
+             conversionRate: Math.round((data.conversions / data.sessions) * 100),
+             avgTimeToConvert: null,
+             avgTouchpoints: 2,
+             isRealData: true,
+             sources: Array.from(data.sources).slice(0, 3)
           });
         }
       });
@@ -995,7 +995,7 @@ export async function GET(request) {
       totalSessions,
       totalConversions,
       totalUsers,
-      overallConversionRate: totalSessions > 0 ? parseFloat(((totalConversions / totalSessions) * 100).toFixed(2)) : 0,
+      overallConversionRate: totalSessions > 0 ? Math.round((totalConversions / totalSessions) * 100) : 0,
       
       // Analysis data
       topConvertingPages: pagesWithTrends.filter(p => p.conversions > 0).slice(0, 10),

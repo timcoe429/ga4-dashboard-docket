@@ -637,8 +637,6 @@ export default function Dashboard() {
                     <p className={`text-xs ${isVisible ? 'text-blue-600' : 'text-gray-500'}`}>
                       {isVisible ? 'Visible' : 'Hidden'}
                     </p>
-                    
-                    {!isVisible && renderMiniDashboard(section.key)}
                   </div>
                 );
               })}
