@@ -1,4 +1,7 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export async function GET(request) {
   try {
@@ -362,30 +365,92 @@ export async function GET(request) {
       data.conversionRate = data.sessions > 0 ? parseFloat(((data.conversions / data.sessions) * 100).toFixed(2)) : 0;
     });
 
-    // User Journey Analysis - Using REAL data only
-    const calculateUserJourneys = (pages) => {
+    // Calculate real time-to-convert metrics from database
+    const calculateTimeToConvertMetrics = async (property) => {
+      try {
+        // Get average time to convert for this property
+        const journeys = await prisma.userJourney.findMany({
+          where: { property },
+          select: {
+            timeToConvertDays: true,
+            touchpointCount: true,
+            conversionType: true,
+            journeyPath: true
+          }
+        });
+
+        if (journeys.length === 0) {
+          return {
+            avgTimeToConvert: null,
+            avgTouchpoints: null,
+            conversionJourneys: []
+          };
+        }
+
+        // Calculate averages
+        const avgTimeToConvert = journeys.reduce((sum, j) => sum + j.timeToConvertDays, 0) / journeys.length;
+        const avgTouchpoints = journeys.reduce((sum, j) => sum + j.touchpointCount, 0) / journeys.length;
+
+        // Group by conversion type
+        const conversionJourneys = journeys.map(journey => ({
+          timeToConvert: `${Math.round(journey.timeToConvertDays * 10) / 10} days`,
+          touchpoints: journey.touchpointCount,
+          conversionType: journey.conversionType,
+          journeyPath: journey.journeyPath
+        }));
+
+        return {
+          avgTimeToConvert: `${Math.round(avgTimeToConvert * 10) / 10} days`,
+          avgTouchpoints: Math.round(avgTouchpoints * 10) / 10,
+          conversionJourneys
+        };
+
+      } catch (error) {
+        console.error('Error calculating time to convert:', error);
+        return {
+          avgTimeToConvert: null,
+          avgTouchpoints: null,
+          conversionJourneys: []
+        };
+      }
+    };
+
+    // User Journey Analysis - Using REAL data from database
+    const calculateUserJourneys = async (pages) => {
+      // Get real time-to-convert data
+      const timeMetrics = await calculateTimeToConvertMetrics(property);
+      
       // Use actual blog posts and product pages from the data
       const actualBlogPosts = pages.filter(p => p.category === 'Blog' && p.sessions > 0).slice(0, 5);
       const actualProductPages = pages.filter(p => p.category === 'Product' && p.sessions > 0).slice(0, 5);
       
-      // Create simple paths based on actual page data - NO FAKE METRICS
+      // Create paths based on actual page data with REAL time-to-convert if available
       const topPaths = pages
         .filter(p => p.sessions > 0)
         .slice(0, 8)
-        .map((page, index) => ({
-          steps: [
-            { 
-              page: page.title || page.page, 
-              url: page.page, 
-              sessions: page.sessions 
-            }
-          ],
-          conversions: page.conversions || 0,
-          users: Math.round(page.sessions * 0.85), // Approximate users from sessions
-          sessions: page.sessions,
-          percentage: Math.round((page.sessions / totalSessions) * 100),
-          conversionRate: page.sessions > 0 ? parseFloat(((page.conversions || 0) / page.sessions * 100).toFixed(1)) : 0
-        }));
+        .map((page, index) => {
+          const matchingJourney = timeMetrics.conversionJourneys.find(j => 
+            j.journeyPath?.some(step => step.page === page.page)
+          );
+          
+          return {
+            steps: [
+              { 
+                page: page.title || page.page, 
+                url: page.page, 
+                sessions: page.sessions 
+              }
+            ],
+            conversions: page.conversions || 0,
+            users: Math.round(page.sessions * 0.85),
+            sessions: page.sessions,
+            percentage: Math.round((page.sessions / totalSessions) * 100),
+            conversionRate: page.sessions > 0 ? parseFloat(((page.conversions || 0) / page.sessions * 100).toFixed(1)) : 0,
+            // Use REAL time-to-convert data if available
+            avgTimeToConvert: matchingJourney?.timeToConvert || null,
+            avgTouchpoints: matchingJourney?.touchpoints || null
+          };
+        });
 
       // Use real pages for assisting pages
       const assistingPages = [
@@ -429,7 +494,11 @@ export async function GET(request) {
           totalTraffic: totalSessions,
           totalConversions: totalConversions,
           avgSessionsPerPath: Math.round(totalSessions / topPaths.length),
-          topPerformingPath: topPaths[0]?.steps[0]?.page || 'No data available'
+          topPerformingPath: topPaths[0]?.steps[0]?.page || 'No data available',
+          // Add real time-to-convert metrics
+          avgTimeToConvert: timeMetrics.avgTimeToConvert,
+          avgTouchpoints: timeMetrics.avgTouchpoints,
+          hasRealData: timeMetrics.conversionJourneys.length > 0
         }
       };
     };
@@ -474,7 +543,7 @@ export async function GET(request) {
       blogPosts: pagesWithTrends.filter(p => p.category === 'Blog').slice(0, 6),
       
       // Advanced Analytics - ENHANCED USER JOURNEYS
-      journeyData: calculateUserJourneys(pagesWithTrends),
+      journeyData: await calculateUserJourneys(pagesWithTrends),
       abTestData: generateABTestData(),
       
       // Comparison data

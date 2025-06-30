@@ -62,4 +62,84 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verificationtokens")
+}
+
+// Analytics tracking tables for time-to-convert
+model UserSession {
+  id               String     @id @default(cuid())
+  sessionId        String     @unique // GA4 session ID or generated
+  userId           String?    // Anonymous user ID (from GA4 or cookie)
+  property         String     // 'docket' or 'servicecore'
+  firstVisitAt     DateTime   @default(now())
+  lastActivityAt   DateTime   @default(now())
+  source           String?    // Traffic source
+  medium           String?    // Traffic medium
+  campaign         String?    // Campaign name
+  referrer         String?    // Referring domain
+  userAgent        String?    // Browser info
+  ipAddress        String?    // For geo tracking
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  pageViews        PageView[]
+  conversions      Conversion[]
+
+  @@map("user_sessions")
+  @@index([property])
+  @@index([firstVisitAt])
+  @@index([userId])
+}
+
+model PageView {
+  id               String      @id @default(cuid())
+  sessionId        String
+  page             String      // Page path
+  title            String?     // Page title
+  timeOnPage       Int?        // Seconds spent on page
+  visitedAt        DateTime    @default(now())
+  exitPage         Boolean     @default(false) // Last page in session
+
+  session          UserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("page_views")
+  @@index([sessionId])
+  @@index([page])
+  @@index([visitedAt])
+}
+
+model Conversion {
+  id               String      @id @default(cuid())
+  sessionId        String
+  conversionType   String      // 'demo_request', 'contact_form', etc.
+  value            Float?      // Conversion value if applicable
+  convertedAt      DateTime    @default(now())
+  conversionPage   String      // Page where conversion happened
+  formData         Json?       // Store form submission data
+
+  session          UserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("conversions")
+  @@index([sessionId])
+  @@index([conversionType])
+  @@index([convertedAt])
+}
+
+model UserJourney {
+  id                  String   @id @default(cuid())
+  userId              String   // Anonymous user ID
+  property            String   // 'docket' or 'servicecore'
+  firstTouchAt        DateTime // First visit timestamp
+  conversionAt        DateTime // Conversion timestamp
+  timeToConvertDays   Float    // Calculated days between first touch and conversion
+  touchpointCount     Int      // Number of sessions before conversion
+  conversionType      String   // Type of conversion
+  journeyPath         Json     // Array of pages visited in order
+  createdAt           DateTime @default(now())
+
+  @@map("user_journeys")
+  @@unique([userId, property, conversionType])
+  @@index([property])
+  @@index([timeToConvertDays])
+  @@index([firstTouchAt])
+  @@index([userId])
 } 

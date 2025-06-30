@@ -117,7 +117,14 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
                               </div>
                             </div>
                           </div>
-                          <div className="text-lg font-bold text-blue-600">{path.avgTimeToConvert}</div>
+                          <div className="text-lg font-bold text-blue-600">
+                            {path.avgTimeToConvert || 'No data yet'}
+                          </div>
+                          {!path.avgTimeToConvert && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Start tracking conversions to see real data
+                            </div>
+                          )}
                         </div>
                         <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                           <div className="flex items-center gap-1 text-sm font-medium text-gray-800">
@@ -145,7 +152,14 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
                               </div>
                             </div>
                           </div>
-                          <div className="text-lg font-bold text-purple-600">{path.avgTouchpoints}</div>
+                          <div className="text-lg font-bold text-purple-600">
+                            {path.avgTouchpoints || 'No data yet'}
+                          </div>
+                          {!path.avgTouchpoints && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Calculated from real user journeys
+                            </div>
+                          )}
                         </div>
                       </div>
                       
