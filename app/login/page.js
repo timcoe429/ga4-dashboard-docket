@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, BarChart3, Shield, Zap } from 'lucide-react';
+import AmericanFooter from '../../components/AmericanFooter';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -167,11 +168,7 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-8">
-          <p className="text-sm text-gray-500">
-            Secure access to your analytics dashboard
-          </p>
-        </div>
+        <AmericanFooter />
       </div>
     </div>
   );

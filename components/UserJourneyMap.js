@@ -90,16 +90,46 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
                   {selectedJourney === index && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="p-3 bg-blue-50 rounded-lg">
-                          <div className="text-sm font-medium text-blue-800">Average Time</div>
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center gap-1 text-sm font-medium text-gray-800">
+                            Average Time to Convert
+                            <div className="relative group">
+                              <svg className="w-3 h-3 text-gray-400 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                              </svg>
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                                Average time from first visit to conversion for this journey path
+                              </div>
+                            </div>
+                          </div>
                           <div className="text-lg font-bold text-blue-600">{path.avgTimeToConvert}</div>
                         </div>
-                        <div className="p-3 bg-green-50 rounded-lg">
-                          <div className="text-sm font-medium text-green-800">Conversion Rate</div>
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center gap-1 text-sm font-medium text-gray-800">
+                            Conversion Rate
+                            <div className="relative group">
+                              <svg className="w-3 h-3 text-gray-400 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                              </svg>
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                                Percentage of visitors who complete this journey and convert
+                              </div>
+                            </div>
+                          </div>
                           <div className="text-lg font-bold text-green-600">{path.conversionRate}%</div>
                         </div>
-                        <div className="p-3 bg-purple-50 rounded-lg">
-                          <div className="text-sm font-medium text-purple-800">Avg. Touchpoints</div>
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center gap-1 text-sm font-medium text-gray-800">
+                            Avg. Touchpoints
+                            <div className="relative group">
+                              <svg className="w-3 h-3 text-gray-400 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                              </svg>
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                                Average number of pages visited before converting on this path
+                              </div>
+                            </div>
+                          </div>
                           <div className="text-lg font-bold text-purple-600">{path.avgTouchpoints}</div>
                         </div>
                       </div>

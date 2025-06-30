@@ -9,6 +9,7 @@ import BlogPosts from '../../components/BlogPosts';
 import CategoryPerformance from '../../components/CategoryPerformance';
 import UserJourneyMap from '../../components/UserJourneyMap';
 import SimpleABTesting from '../../components/ABTestingDashboard';
+import AmericanFooter from '../../components/AmericanFooter';
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
@@ -723,6 +724,9 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        {/* Footer */}
+        <AmericanFooter />
       </div>
     </div>
     </>
