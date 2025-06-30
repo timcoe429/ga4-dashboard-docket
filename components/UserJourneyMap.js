@@ -43,7 +43,7 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
                   key={index} 
                   className={`border rounded-lg p-4 transition-all cursor-pointer ${
                     selectedJourney === index 
-                      ? 'border-blue-400 shadow-lg shadow-blue-200 bg-blue-50' 
+                      ? 'border-blue-400 shadow-lg shadow-blue-200' 
                       : 'border-gray-200 hover:shadow-md hover:border-gray-300'
                   }`}
                   onClick={() => setSelectedJourney(selectedJourney === index ? null : index)}
@@ -68,22 +68,37 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
 
                   {/* Path Visualization */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    {path.steps.map((step, stepIndex) => (
-                      <div key={stepIndex} className="flex items-center gap-2">
-                        <div className={`px-3 py-2 rounded-lg text-sm font-medium ${
-                          stepIndex === path.steps.length - 1 ? 
-                            'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          <div>{step.page}</div>
-                          {step.url && (
-                            <div className="text-xs opacity-75 mt-1">{step.url}</div>
+                    {path.steps.map((step, stepIndex) => {
+                      // Create a nice color progression: blue -> purple -> green
+                      let bgColor, textColor;
+                      if (stepIndex === 0) {
+                        bgColor = 'bg-blue-100';
+                        textColor = 'text-blue-800';
+                      } else if (stepIndex === path.steps.length - 1) {
+                        bgColor = 'bg-green-100';
+                        textColor = 'text-green-800';
+                      } else {
+                        bgColor = 'bg-purple-100';
+                        textColor = 'text-purple-800';
+                      }
+                      
+                      return (
+                        <div key={stepIndex} className="flex items-center gap-2">
+                          <div className={`px-3 py-2 rounded-lg text-sm font-medium ${bgColor} ${textColor}`}>
+                            <div>{step.page}</div>
+                            {/* Only show URLs when expanded */}
+                            {selectedJourney === index && step.url && (
+                              <div className="text-xs opacity-75 mt-1">{step.url}</div>
+                            )}
+                          </div>
+                          {stepIndex < path.steps.length - 1 && (
+                            <ArrowRight className={`w-4 h-4 ${
+                              stepIndex === 0 ? 'text-blue-400' : 'text-purple-400'
+                            }`} />
                           )}
                         </div>
-                        {stepIndex < path.steps.length - 1 && (
-                          <ArrowRight className="w-4 h-4 text-gray-400" />
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Expanded Details */}
@@ -97,7 +112,7 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
                               <svg className="w-3 h-3 text-gray-400 cursor-help" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                               </svg>
-                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 w-48 text-center">
                                 Average time from first visit to conversion for this journey path
                               </div>
                             </div>
@@ -111,7 +126,7 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
                               <svg className="w-3 h-3 text-gray-400 cursor-help" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                               </svg>
-                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 w-48 text-center">
                                 Percentage of visitors who complete this journey and convert
                               </div>
                             </div>
@@ -125,7 +140,7 @@ export default function UserJourneyMap({ journeyData, showComparison = false }) 
                               <svg className="w-3 h-3 text-gray-400 cursor-help" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                               </svg>
-                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 w-48 text-center">
                                 Average number of pages visited before converting on this path
                               </div>
                             </div>
