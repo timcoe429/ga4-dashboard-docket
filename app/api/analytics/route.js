@@ -110,33 +110,46 @@ export async function GET(request) {
       return cleanPath.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || 'Page';
     }
 
-    // Build domain filter expressions - CRITICAL: Include ONLY the correct domain first
-    const domainFilterExpressions = [
-      // FIRST: Include ONLY the specified domain(s) for this property
-      ...(currentConfig.includeDomains.length === 1 ? [
-        { filter: { fieldName: 'hostName', stringFilter: { value: currentConfig.includeDomains[0], matchType: 'EXACT' } } }
-      ] : [
-        {
-          orGroup: {
-            expressions: currentConfig.includeDomains.map(domain => ({
-              filter: { fieldName: 'hostName', stringFilter: { value: domain, matchType: 'EXACT' } }
-            }))
-          }
+    // PRECISE DOMAIN FILTERING: Include only the exact domains needed
+    const domainFilterExpressions = [];
+    
+    // For Docket: Include ONLY yourdocket.com AND www.yourdocket.com
+    if (property === 'docket') {
+      domainFilterExpressions.push({
+        orGroup: {
+          expressions: [
+            { filter: { fieldName: 'hostName', stringFilter: { value: 'yourdocket.com', matchType: 'EXACT' } } },
+            { filter: { fieldName: 'hostName', stringFilter: { value: 'www.yourdocket.com', matchType: 'EXACT' } } }
+          ]
         }
-      ]),
-      // THEN: Exclude specific subdomains within that domain
-      ...currentConfig.excludeDomains.map(domain => ({
-        notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: domain, matchType: 'EXACT' } } }
-      })),
-      // FINALLY: Exclude auth/admin paths
+      });
+    }
+    
+    // For ServiceCore: Include ONLY servicecore.com (no www)
+    if (property === 'servicecore') {
+      domainFilterExpressions.push(
+        { filter: { fieldName: 'hostName', stringFilter: { value: 'servicecore.com', matchType: 'EXACT' } } }
+      );
+    }
+    
+    // Always exclude admin/auth paths and app subdomains
+    domainFilterExpressions.push(
       { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/__/auth', matchType: 'CONTAINS' } } } },
       { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: '/auth/', matchType: 'CONTAINS' } } } },
-      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } }
-    ];
+      { notExpression: { filter: { fieldName: 'pagePath', stringFilter: { value: 'iframe', matchType: 'CONTAINS' } } } },
+      // Exclude app subdomains specifically
+      ...currentConfig.excludeDomains.map(domain => ({
+        notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: domain, matchType: 'EXACT' } } }
+      }))
+    );
 
-    console.log('🔒 Domain Filter Debug:');
-    console.log('  - Include domains:', currentConfig.includeDomains);
-    console.log('  - Exclude domains:', currentConfig.excludeDomains);
+    console.log('🎯 PRECISE DOMAIN FILTERING:');
+    console.log('  - Property:', property);
+    if (property === 'docket') {
+      console.log('  - Including: yourdocket.com + www.yourdocket.com');
+    } else if (property === 'servicecore') {
+      console.log('  - Including: servicecore.com ONLY');
+    }
     console.log('  - Filter expressions count:', domainFilterExpressions.length);
 
     // Get current period data
