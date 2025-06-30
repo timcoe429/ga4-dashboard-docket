@@ -585,18 +585,24 @@ export async function GET(request) {
       }
     };
 
-    // User Journey Analysis - Hybrid approach: Real data + logical journey modeling
+    // User Journey Analysis - ALWAYS SHOW LOGICAL PATHS + Real data if available
     const calculateUserJourneys = async (pages) => {
       // Get real time-to-convert data
       const timeMetrics = await calculateTimeToConvertMetrics(property);
       
-      // If we have real journey data, use it
-      if (timeMetrics.conversionJourneys.length > 0) {
-        return createRealJourneyPaths(timeMetrics, pages, totalSessions, totalConversions);
-      }
+      console.log('🔍 DEBUGGING JOURNEY LOGIC:');
+      console.log('  - Real journeys found:', timeMetrics.conversionJourneys.length);
+      console.log('  - Will use:', timeMetrics.conversionJourneys.length > 0 ? 'REAL DATA ONLY' : 'LOGICAL PATHS');
       
-      // Otherwise, create logical journey paths from real GA4 data
+      // FOR NOW: ALWAYS use logical journey paths to get them working
+      console.log('  - FORCING LOGICAL PATHS to debug the issue');
       return createLogicalJourneyPaths(pages, totalSessions, totalConversions);
+      
+      // Original logic (commented out for debugging):
+      // if (timeMetrics.conversionJourneys.length > 0) {
+      //   return createRealJourneyPaths(timeMetrics, pages, totalSessions, totalConversions);
+      // }
+      // return createLogicalJourneyPaths(pages, totalSessions, totalConversions);
     };
 
     // Create real journey paths from database tracking data
@@ -640,6 +646,15 @@ export async function GET(request) {
       console.log('  - Real Schedule-a-Demo page found:', !!scheduleADemoPage, scheduleADemoPage?.page);
       console.log('  - Real Dumpster Software page found:', !!dumpsterSoftwarePage, dumpsterSoftwarePage?.page);
       console.log('  - Real Junk Software page found:', !!junkSoftwarePage, junkSoftwarePage?.page);
+      
+      // SHOW ALL PAGES to see what we're actually working with
+      console.log('📄 ALL GA4 PAGES AVAILABLE:');
+      pages.slice(0, 10).forEach((page, index) => {
+        console.log(`    ${index + 1}. ${page.page} (${page.sessions} sessions, ${page.conversions || 0} conversions)`);
+      });
+      if (pages.length > 10) {
+        console.log(`    ... and ${pages.length - 10} more pages`);
+      }
 
       const topPaths = [];
 
